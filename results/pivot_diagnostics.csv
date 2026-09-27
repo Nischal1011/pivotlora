@@ -1,0 +1,10 @@
+experiment_family,task_or_dataset,seed,adapters_pivoted,pivot_epoch,pivot_step,mean_preservation_error,max_preservation_error,mean_span_residual,orthogonality_error_before,orthogonality_error_after,mean_alignment_change,optimizer_state_reset,source
+classification,agnews,aggregated_3_seeds,72,3,,3.14e-07,8.82e-07,2.94e-07,2.809,4.84e-07,2.77e-09,A only (B retained),paper_table_pivot-diagnostics
+classification,cola,aggregated_3_seeds,72,3,,3.00e-07,5.07e-07,2.87e-07,2.809,4.69e-07,-2.31e-09,A only (B retained),paper_table_pivot-diagnostics
+classification,sst2,aggregated_3_seeds,72,3,,2.79e-07,7.91e-07,2.89e-07,2.809,4.76e-07,2.56e-10,A only (B retained),paper_table_pivot-diagnostics
+reasoning,gsm8k,42,64,3,48,,1.2947022068694082e-07,,,2.3755287342740744e-08,,A and B,pivot_diagnostics_response_matched/gsm8k_response_pca_qr_matched_v1_seed_42.json
+reasoning,gsm8k,43,64,3,48,,1.2682279237621856e-07,,,1.6041505012410247e-08,,A and B,pivot_diagnostics_response_matched/gsm8k_response_pca_qr_matched_v1_seed_43.json
+reasoning,gsm8k,44,64,3,48,,1.326201872649239e-07,,,2.0266623032007824e-08,,A and B,pivot_diagnostics_response_matched/gsm8k_response_pca_qr_matched_v1_seed_44.json
+reasoning,svamp,42,64,3,48,,1.3284347556041658e-07,,,1.1545608400888366e-08,,A and B,pivot_diagnostics_svamp_response_matched/svamp_response_pca_qr_matched_v1_seed_42.json
+reasoning,svamp,43,64,3,48,,1.2908644342741866e-07,,,1.3728148963169992e-08,,A and B,pivot_diagnostics_svamp_response_matched/svamp_response_pca_qr_matched_v1_seed_43.json
+reasoning,svamp,44,64,3,48,,1.2528715345775008e-07,,,1.1254800662142749e-08,,A and B,pivot_diagnostics_svamp_response_matched/svamp_response_pca_qr_matched_v1_seed_44.json

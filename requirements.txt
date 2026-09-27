@@ -1,0 +1,55 @@
+# PivotLoRA dependencies.
+#
+# PROVENANCE, stated precisely:
+#
+#   * torch is pinned to the version actually recorded at run time for the
+#     GSM8K/SVAMP reasoning experiments (printed by report_hardware() and
+#     captured in both full-run logs): 2.9.0+cu128 with CUDA 12.8.
+#
+#   * No environment snapshot was captured for the BERT, GPT-2, or decoder
+#     classification runs. The remaining pins below are the versions in which
+#     this released code was verified to byte-compile, import, and pass
+#     tests/ at packaging time. They are NOT a reconstruction of the original
+#     run environments, and this file is not a lock file.
+#
+#   * No model or dataset `revision` is pinned anywhere in this repository.
+#     Exact reconstruction therefore also depends on Hugging Face Hub state.
+#
+# Install the CUDA build of torch that matches your driver; the index URL
+# below is for CUDA 12.8. For CPU-only use (enough to run tests/ and
+# analysis/), plain `pip install torch` is sufficient.
+#
+#   pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cu128
+#   pip install -r requirements.txt
+
+torch==2.9.0
+transformers==5.14.1
+datasets==5.0.1
+peft==0.20.0
+accelerate==1.14.0
+
+numpy==2.4.6
+scipy==1.17.1
+scikit-learn==1.9.0
+pandas==3.0.5
+
+huggingface-hub==1.26.0
+tokenizers==0.22.2
+safetensors==0.8.0
+sentencepiece
+protobuf
+
+# Summarization controls only (src/summarization_*.py).
+rouge-score
+nltk
+evaluate
+
+# Config parsing, progress, and the offline checks in tests/ and analysis/.
+PyYAML==6.0.3
+tqdm==4.70.0
+pytest==9.1.1
+psutil==7.2.2
+
+# Plotting for the alignment figure.
+matplotlib==3.11.2
+seaborn==0.13.2

@@ -1,0 +1,15 @@
+comparison,method,agnews,sst2,cola,average,source
+best_swept,PivotLoRA,0.843,0.822,0.335,0.667,paper_table_lr-best+lr-sensitivity
+best_swept,TT-PCA,0.817,0.821,0.328,0.655,paper_table_lr-best+lr-sensitivity
+best_swept,LoRA+,0.833,0.757,0.318,0.636,paper_table_lr-best+lr-sensitivity
+best_swept,LoRA,0.781,0.784,0.301,0.622,paper_table_lr-best+lr-sensitivity
+best_swept,EVA,0.742,0.786,0.327,0.618,paper_table_lr-best+lr-sensitivity
+best_swept,LoRAM,0.732,0.789,0.330,0.617,paper_table_lr-best+lr-sensitivity
+best_swept,PiSSA,0.754,0.733,0.330,0.606,paper_table_lr-best+lr-sensitivity
+shared_anchor,PivotLoRA,,,,0.661,paper_table_lr-sensitivity
+shared_anchor,TT-PCA,,,,0.643,paper_table_lr-sensitivity
+shared_anchor,LoRA,,,,0.522,paper_table_lr-sensitivity
+shared_anchor,LoRAM,,,,0.428,paper_table_lr-sensitivity
+shared_anchor,EVA,,,,0.424,paper_table_lr-sensitivity
+shared_anchor,PiSSA,,,,0.420,paper_table_lr-sensitivity
+shared_anchor,LoRA+,,,,0.326,paper_table_lr-sensitivity

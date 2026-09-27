@@ -1,0 +1,661 @@
+{
+  "protocol": "svamp_response_pca_qr_matched_v1",
+  "dataset": "ChilleD/SVAMP",
+  "pivot_epoch_requested": 3,
+  "epoch_executed": 3.0,
+  "global_step": 48,
+  "pivoted_modules": 64,
+  "optimizer_state_reset": [
+    "lora_A",
+    "lora_B"
+  ],
+  "learning_rate_override": false,
+  "preservation_tolerance": 1e-05,
+  "maximum_preservation_error": 1.2528715345775008e-07,
+  "minimum_orthogonality_before": 2.694527585834151,
+  "maximum_orthogonality_after": 1.1254800662142749e-08,
+  "all_updates_preserved": true,
+  "all_bases_orthonormal": true,
+  "modules": [
+    {
+      "module": "model.layers.0.self_attn.q_proj",
+      "preservation_error": 1.0609369445071917e-07,
+      "orthogonality_before": 2.750217770950731,
+      "orthogonality_after": 9.638463475459208e-09,
+      "A_old_norm": 0.48012913106946764,
+      "A_new_norm": 2.8284271268902814,
+      "B_old_norm": 0.41400967347194445,
+      "B_new_norm": 0.13138160595733106
+    },
+    {
+      "module": "model.layers.0.self_attn.v_proj",
+      "preservation_error": 7.337217677575293e-08,
+      "orthogonality_before": 2.768978564276871,
+      "orthogonality_after": 8.68686075523883e-09,
+      "A_old_norm": 0.413160218608159,
+      "A_new_norm": 2.8284271264754897,
+      "B_old_norm": 0.19789021060525838,
+      "B_new_norm": 0.045765730831855186
+    },
+    {
+      "module": "model.layers.1.self_attn.q_proj",
+      "preservation_error": 1.1563418974917977e-07,
+      "orthogonality_before": 2.7798410174012598,
+      "orthogonality_after": 9.83579808880845e-09,
+      "A_old_norm": 0.37406869777053026,
+      "A_new_norm": 2.8284271253093407,
+      "B_old_norm": 0.38654715292516584,
+      "B_new_norm": 0.0911210789347791
+    },
+    {
+      "module": "model.layers.1.self_attn.v_proj",
+      "preservation_error": 8.95184746213349e-08,
+      "orthogonality_before": 2.758653497369114,
+      "orthogonality_after": 5.439655630386571e-09,
+      "A_old_norm": 0.45061000755997394,
+      "A_new_norm": 2.828427123999422,
+      "B_old_norm": 0.20167224506077291,
+      "B_new_norm": 0.06066342345678442
+    },
+    {
+      "module": "model.layers.2.self_attn.q_proj",
+      "preservation_error": 1.2528715345775008e-07,
+      "orthogonality_before": 2.7645421532752534,
+      "orthogonality_after": 1.0063322241987019e-08,
+      "A_old_norm": 0.4295302253832542,
+      "A_new_norm": 2.8284271264653857,
+      "B_old_norm": 0.3879047540174909,
+      "B_new_norm": 0.09748949288142403
+    },
+    {
+      "module": "model.layers.2.self_attn.v_proj",
+      "preservation_error": 6.462257775012737e-08,
+      "orthogonality_before": 2.7556110254618216,
+      "orthogonality_after": 1.1254800662142749e-08,
+      "A_old_norm": 0.4683052421995561,
+      "A_new_norm": 2.828427124894237,
+      "B_old_norm": 0.20400970606787483,
+      "B_new_norm": 0.0762596607184921
+    },
+    {
+      "module": "model.layers.3.self_attn.q_proj",
+      "preservation_error": 9.690216780851562e-08,
+      "orthogonality_before": 2.770330912397547,
+      "orthogonality_after": 8.95793458419449e-09,
+      "A_old_norm": 0.41160804755444247,
+      "A_new_norm": 2.8284271243134067,
+      "B_old_norm": 0.38622410697705645,
+      "B_new_norm": 0.11371837765037178
+    },
+    {
+      "module": "model.layers.3.self_attn.v_proj",
+      "preservation_error": 1.73771174499249e-08,
+      "orthogonality_before": 2.7643506626069314,
+      "orthogonality_after": 7.660930546143807e-09,
+      "A_old_norm": 0.439322910187061,
+      "A_new_norm": 2.8284271250433077,
+      "B_old_norm": 0.20477862252688067,
+      "B_new_norm": 0.07579444763964166
+    },
+    {
+      "module": "model.layers.4.self_attn.q_proj",
+      "preservation_error": 1.0457750904354524e-07,
+      "orthogonality_before": 2.7567519707237587,
+      "orthogonality_after": 7.601408648003777e-09,
+      "A_old_norm": 0.4648615661297631,
+      "A_new_norm": 2.828427125994856,
+      "B_old_norm": 0.4042944618707701,
+      "B_new_norm": 0.15321726019876483
+    },
+    {
+      "module": "model.layers.4.self_attn.v_proj",
+      "preservation_error": 6.352008347653593e-08,
+      "orthogonality_before": 2.7455828847047186,
+      "orthogonality_after": 5.920699803993571e-09,
+      "A_old_norm": 0.5049445434092593,
+      "A_new_norm": 2.828427125315722,
+      "B_old_norm": 0.21119502723250716,
+      "B_new_norm": 0.09272974516560271
+    },
+    {
+      "module": "model.layers.5.self_attn.q_proj",
+      "preservation_error": 1.1578041950420788e-07,
+      "orthogonality_before": 2.751004532859612,
+      "orthogonality_after": 7.310118587286973e-09,
+      "A_old_norm": 0.47790014826578014,
+      "A_new_norm": 2.828427123041307,
+      "B_old_norm": 0.425372684274564,
+      "B_new_norm": 0.14024965553742708
+    },
+    {
+      "module": "model.layers.5.self_attn.v_proj",
+      "preservation_error": 6.849158741306607e-08,
+      "orthogonality_before": 2.7409066189743903,
+      "orthogonality_after": 8.463036683819672e-09,
+      "A_old_norm": 0.5185293263652822,
+      "A_new_norm": 2.8284271255854785,
+      "B_old_norm": 0.21167024379777485,
+      "B_new_norm": 0.09420707436846751
+    },
+    {
+      "module": "model.layers.6.self_attn.q_proj",
+      "preservation_error": 8.843333355352166e-08,
+      "orthogonality_before": 2.757385399086541,
+      "orthogonality_after": 5.582100376913108e-09,
+      "A_old_norm": 0.4596946310150527,
+      "A_new_norm": 2.8284271245428667,
+      "B_old_norm": 0.4017685381312207,
+      "B_new_norm": 0.13971417402556421
+    },
+    {
+      "module": "model.layers.6.self_attn.v_proj",
+      "preservation_error": 7.706308931375032e-08,
+      "orthogonality_before": 2.7307584518168877,
+      "orthogonality_after": 6.550925804522691e-09,
+      "A_old_norm": 0.5545854420053783,
+      "A_new_norm": 2.828427124528072,
+      "B_old_norm": 0.21447917694264082,
+      "B_new_norm": 0.10535630011217283
+    },
+    {
+      "module": "model.layers.7.self_attn.q_proj",
+      "preservation_error": 1.0821634003071867e-07,
+      "orthogonality_before": 2.7462541985790523,
+      "orthogonality_after": 6.969846763164259e-09,
+      "A_old_norm": 0.49662675298043724,
+      "A_new_norm": 2.828427124673003,
+      "B_old_norm": 0.42045273956589574,
+      "B_new_norm": 0.1614650831696914
+    },
+    {
+      "module": "model.layers.7.self_attn.v_proj",
+      "preservation_error": 9.198322840731773e-08,
+      "orthogonality_before": 2.7444909241318394,
+      "orthogonality_after": 6.3854778819554825e-09,
+      "A_old_norm": 0.5054749059171006,
+      "A_new_norm": 2.8284271251566935,
+      "B_old_norm": 0.20996000622612795,
+      "B_new_norm": 0.08709783135164051
+    },
+    {
+      "module": "model.layers.8.self_attn.q_proj",
+      "preservation_error": 9.903146884150874e-08,
+      "orthogonality_before": 2.75836683439718,
+      "orthogonality_after": 6.4763401996430365e-09,
+      "A_old_norm": 0.4563884481642157,
+      "A_new_norm": 2.8284271246612716,
+      "B_old_norm": 0.39987896800422795,
+      "B_new_norm": 0.13821455658863363
+    },
+    {
+      "module": "model.layers.8.self_attn.v_proj",
+      "preservation_error": 4.607675673403506e-08,
+      "orthogonality_before": 2.7328580948023706,
+      "orthogonality_after": 5.80231113919653e-09,
+      "A_old_norm": 0.545706296407458,
+      "A_new_norm": 2.8284271241526353,
+      "B_old_norm": 0.2140477116924957,
+      "B_new_norm": 0.09902021123080205
+    },
+    {
+      "module": "model.layers.9.self_attn.q_proj",
+      "preservation_error": 9.917767044759582e-08,
+      "orthogonality_before": 2.7636437898383828,
+      "orthogonality_after": 6.8359812059424496e-09,
+      "A_old_norm": 0.4340692058964372,
+      "A_new_norm": 2.8284271241869736,
+      "B_old_norm": 0.40442958187159384,
+      "B_new_norm": 0.11878079256015016
+    },
+    {
+      "module": "model.layers.9.self_attn.v_proj",
+      "preservation_error": 6.243807708400756e-08,
+      "orthogonality_before": 2.746688003055764,
+      "orthogonality_after": 7.721746833371864e-09,
+      "A_old_norm": 0.49544914946806784,
+      "A_new_norm": 2.828427125097872,
+      "B_old_norm": 0.20389206418122258,
+      "B_new_norm": 0.07892773248460139
+    },
+    {
+      "module": "model.layers.10.self_attn.q_proj",
+      "preservation_error": 1.2177995544482961e-07,
+      "orthogonality_before": 2.7400292201364507,
+      "orthogonality_after": 6.52940686187592e-09,
+      "A_old_norm": 0.5137504420650784,
+      "A_new_norm": 2.8284271252525253,
+      "B_old_norm": 0.4211356553367528,
+      "B_new_norm": 0.1559807429437508
+    },
+    {
+      "module": "model.layers.10.self_attn.v_proj",
+      "preservation_error": 6.435081499368775e-08,
+      "orthogonality_before": 2.757314471045248,
+      "orthogonality_after": 7.863399657887898e-09,
+      "A_old_norm": 0.45993488183563763,
+      "A_new_norm": 2.8284271239136944,
+      "B_old_norm": 0.20109396189918896,
+      "B_new_norm": 0.07379598816907552
+    },
+    {
+      "module": "model.layers.11.self_attn.q_proj",
+      "preservation_error": 1.0461889101339034e-07,
+      "orthogonality_before": 2.7804859122413643,
+      "orthogonality_after": 7.3556078363037615e-09,
+      "A_old_norm": 0.37054006898778524,
+      "A_new_norm": 2.8284271237340386,
+      "B_old_norm": 0.38427191703754043,
+      "B_new_norm": 0.08158863383270827
+    },
+    {
+      "module": "model.layers.11.self_attn.v_proj",
+      "preservation_error": 8.779291298374827e-08,
+      "orthogonality_before": 2.7483134098469106,
+      "orthogonality_after": 5.0240736472154035e-09,
+      "A_old_norm": 0.48678315123607185,
+      "A_new_norm": 2.8284271256425546,
+      "B_old_norm": 0.2088061632097028,
+      "B_new_norm": 0.07194814259447242
+    },
+    {
+      "module": "model.layers.12.self_attn.q_proj",
+      "preservation_error": 1.0350372315353961e-07,
+      "orthogonality_before": 2.7651425820084796,
+      "orthogonality_after": 5.338695134527372e-09,
+      "A_old_norm": 0.4269795083361171,
+      "A_new_norm": 2.8284271234712923,
+      "B_old_norm": 0.3906286422671343,
+      "B_new_norm": 0.09856773594732923
+    },
+    {
+      "module": "model.layers.12.self_attn.v_proj",
+      "preservation_error": 6.544913228687364e-08,
+      "orthogonality_before": 2.7453148549953466,
+      "orthogonality_after": 6.980995918424971e-09,
+      "A_old_norm": 0.5029554352031462,
+      "A_new_norm": 2.828427123977453,
+      "B_old_norm": 0.21177708098468734,
+      "B_new_norm": 0.08999662711983065
+    },
+    {
+      "module": "model.layers.13.self_attn.q_proj",
+      "preservation_error": 1.021113179859636e-07,
+      "orthogonality_before": 2.761991866382876,
+      "orthogonality_after": 5.817232472407481e-09,
+      "A_old_norm": 0.43913009037131145,
+      "A_new_norm": 2.828427124538911,
+      "B_old_norm": 0.37979571788503425,
+      "B_new_norm": 0.10478840116656968
+    },
+    {
+      "module": "model.layers.13.self_attn.v_proj",
+      "preservation_error": 5.144834870530879e-08,
+      "orthogonality_before": 2.744148594989694,
+      "orthogonality_after": 1.072299723499514e-08,
+      "A_old_norm": 0.5092125325043408,
+      "A_new_norm": 2.8284271251492417,
+      "B_old_norm": 0.21534572127200355,
+      "B_new_norm": 0.09578725018875735
+    },
+    {
+      "module": "model.layers.14.self_attn.q_proj",
+      "preservation_error": 1.0961627884608867e-07,
+      "orthogonality_before": 2.7601360426046084,
+      "orthogonality_after": 7.4068631438824815e-09,
+      "A_old_norm": 0.4504348953422004,
+      "A_new_norm": 2.8284271235795306,
+      "B_old_norm": 0.39998757687041714,
+      "B_new_norm": 0.14418541072781063
+    },
+    {
+      "module": "model.layers.14.self_attn.v_proj",
+      "preservation_error": 7.678040867651348e-08,
+      "orthogonality_before": 2.7565426077058426,
+      "orthogonality_after": 8.015641953113931e-09,
+      "A_old_norm": 0.4620058267402945,
+      "A_new_norm": 2.8284271250642483,
+      "B_old_norm": 0.21057580139520024,
+      "B_new_norm": 0.0767148970014391
+    },
+    {
+      "module": "model.layers.15.self_attn.q_proj",
+      "preservation_error": 8.91452279013722e-08,
+      "orthogonality_before": 2.7371763566232774,
+      "orthogonality_after": 8.091968876653605e-09,
+      "A_old_norm": 0.523814391621362,
+      "A_new_norm": 2.8284271229768905,
+      "B_old_norm": 0.4590714642522301,
+      "B_new_norm": 0.1821540462128062
+    },
+    {
+      "module": "model.layers.15.self_attn.v_proj",
+      "preservation_error": 7.750043261676939e-08,
+      "orthogonality_before": 2.727292542334996,
+      "orthogonality_after": 6.379909647782065e-09,
+      "A_old_norm": 0.5544760556971353,
+      "A_new_norm": 2.828427123767577,
+      "B_old_norm": 0.22862447195430796,
+      "B_new_norm": 0.09613598713391265
+    },
+    {
+      "module": "model.layers.16.self_attn.q_proj",
+      "preservation_error": 1.0457964138025286e-07,
+      "orthogonality_before": 2.72767052539049,
+      "orthogonality_after": 1.0232784230450279e-08,
+      "A_old_norm": 0.5656866974002436,
+      "A_new_norm": 2.828427126916386,
+      "B_old_norm": 0.46530329301140927,
+      "B_new_norm": 0.23358621051716097
+    },
+    {
+      "module": "model.layers.16.self_attn.v_proj",
+      "preservation_error": 6.294434187502706e-08,
+      "orthogonality_before": 2.722974264244639,
+      "orthogonality_after": 7.717877774567466e-09,
+      "A_old_norm": 0.5762023483965106,
+      "A_new_norm": 2.8284271254821807,
+      "B_old_norm": 0.240076819284285,
+      "B_new_norm": 0.11836775758192647
+    },
+    {
+      "module": "model.layers.17.self_attn.q_proj",
+      "preservation_error": 1.0647876145229462e-07,
+      "orthogonality_before": 2.711757264040488,
+      "orthogonality_after": 4.40449988102062e-09,
+      "A_old_norm": 0.5939945236350977,
+      "A_new_norm": 2.828427124768711,
+      "B_old_norm": 0.4909883353915634,
+      "B_new_norm": 0.20098058253381276
+    },
+    {
+      "module": "model.layers.17.self_attn.v_proj",
+      "preservation_error": 0.0,
+      "orthogonality_before": 2.7183137826489983,
+      "orthogonality_after": 8.84081218940582e-09,
+      "A_old_norm": 0.5920437489932528,
+      "A_new_norm": 2.8284271238496985,
+      "B_old_norm": 0.2564408021723,
+      "B_new_norm": 0.1312385187355493
+    },
+    {
+      "module": "model.layers.18.self_attn.q_proj",
+      "preservation_error": 1.1793652076797453e-07,
+      "orthogonality_before": 2.722638401492928,
+      "orthogonality_after": 8.620518594828652e-09,
+      "A_old_norm": 0.5705375515790138,
+      "A_new_norm": 2.828427126389821,
+      "B_old_norm": 0.47149912069521377,
+      "B_new_norm": 0.20952610890982248
+    },
+    {
+      "module": "model.layers.18.self_attn.v_proj",
+      "preservation_error": 3.085196747666614e-08,
+      "orthogonality_before": 2.7036916425180744,
+      "orthogonality_after": 7.657158159825463e-09,
+      "A_old_norm": 0.6236992170533626,
+      "A_new_norm": 2.8284271244429307,
+      "B_old_norm": 0.25392634644633477,
+      "B_new_norm": 0.12074725239848479
+    },
+    {
+      "module": "model.layers.19.self_attn.q_proj",
+      "preservation_error": 1.0695609108534505e-07,
+      "orthogonality_before": 2.715519078335181,
+      "orthogonality_after": 6.375422417095128e-09,
+      "A_old_norm": 0.5873354351621344,
+      "A_new_norm": 2.828427125418585,
+      "B_old_norm": 0.49877581081392197,
+      "B_new_norm": 0.22572478295080411
+    },
+    {
+      "module": "model.layers.19.self_attn.v_proj",
+      "preservation_error": 7.034681885592578e-08,
+      "orthogonality_before": 2.699962371028627,
+      "orthogonality_after": 6.5744633138285485e-09,
+      "A_old_norm": 0.6258027171262988,
+      "A_new_norm": 2.8284271239581487,
+      "B_old_norm": 0.2548135274597222,
+      "B_new_norm": 0.11233676550476424
+    },
+    {
+      "module": "model.layers.20.self_attn.q_proj",
+      "preservation_error": 1.0645058982476921e-07,
+      "orthogonality_before": 2.7420648824120644,
+      "orthogonality_after": 6.532611087142379e-09,
+      "A_old_norm": 0.5040819902509043,
+      "A_new_norm": 2.8284271259525484,
+      "B_old_norm": 0.46883915326579334,
+      "B_new_norm": 0.15650457843406512
+    },
+    {
+      "module": "model.layers.20.self_attn.v_proj",
+      "preservation_error": 0.0,
+      "orthogonality_before": 2.7152767640853948,
+      "orthogonality_after": 6.479374331981686e-09,
+      "A_old_norm": 0.601156904691898,
+      "A_new_norm": 2.828427125709205,
+      "B_old_norm": 0.2586056440746732,
+      "B_new_norm": 0.13471430048579403
+    },
+    {
+      "module": "model.layers.21.self_attn.q_proj",
+      "preservation_error": 1.0670531653861169e-07,
+      "orthogonality_before": 2.7335024772838734,
+      "orthogonality_after": 7.339432633219411e-09,
+      "A_old_norm": 0.5367974195374323,
+      "A_new_norm": 2.828427125750432,
+      "B_old_norm": 0.5080932663078422,
+      "B_new_norm": 0.21521169164333667
+    },
+    {
+      "module": "model.layers.21.self_attn.v_proj",
+      "preservation_error": 0.0,
+      "orthogonality_before": 2.698078524403442,
+      "orthogonality_after": 6.920034598542352e-09,
+      "A_old_norm": 0.639667762258312,
+      "A_new_norm": 2.8284271243910912,
+      "B_old_norm": 0.27163625460501845,
+      "B_new_norm": 0.1335526848330143
+    },
+    {
+      "module": "model.layers.22.self_attn.q_proj",
+      "preservation_error": 1.2197234175109736e-07,
+      "orthogonality_before": 2.7139714396541557,
+      "orthogonality_after": 9.417543830619381e-09,
+      "A_old_norm": 0.6039528416009449,
+      "A_new_norm": 2.8284271239741416,
+      "B_old_norm": 0.5022919867691742,
+      "B_new_norm": 0.2555334621892598
+    },
+    {
+      "module": "model.layers.22.self_attn.v_proj",
+      "preservation_error": 7.4469900992609e-08,
+      "orthogonality_before": 2.6980496676113526,
+      "orthogonality_after": 9.923282836452562e-09,
+      "A_old_norm": 0.6491352690234712,
+      "A_new_norm": 2.8284271251742195,
+      "B_old_norm": 0.2702069250321474,
+      "B_new_norm": 0.1414895412540878
+    },
+    {
+      "module": "model.layers.23.self_attn.q_proj",
+      "preservation_error": 8.680851528240049e-08,
+      "orthogonality_before": 2.728490561786349,
+      "orthogonality_after": 8.852104895746413e-09,
+      "A_old_norm": 0.5597032877752077,
+      "A_new_norm": 2.8284271233850657,
+      "B_old_norm": 0.5048897728879052,
+      "B_new_norm": 0.2427575703401091
+    },
+    {
+      "module": "model.layers.23.self_attn.v_proj",
+      "preservation_error": 7.734450273634227e-08,
+      "orthogonality_before": 2.7076503386326025,
+      "orthogonality_after": 9.520633405887741e-09,
+      "A_old_norm": 0.6260400493724538,
+      "A_new_norm": 2.828427125710054,
+      "B_old_norm": 0.26338342592038283,
+      "B_new_norm": 0.14449470256152697
+    },
+    {
+      "module": "model.layers.24.self_attn.q_proj",
+      "preservation_error": 1.1778340927074368e-07,
+      "orthogonality_before": 2.7362531988760437,
+      "orthogonality_after": 8.022142989440293e-09,
+      "A_old_norm": 0.5237537939085012,
+      "A_new_norm": 2.828427124061169,
+      "B_old_norm": 0.4854187323473956,
+      "B_new_norm": 0.1816908139521693
+    },
+    {
+      "module": "model.layers.24.self_attn.v_proj",
+      "preservation_error": 6.619096979382912e-08,
+      "orthogonality_before": 2.713415295602339,
+      "orthogonality_after": 8.996906688540792e-09,
+      "A_old_norm": 0.5976284796045972,
+      "A_new_norm": 2.8284271244135635,
+      "B_old_norm": 0.2698748447213123,
+      "B_new_norm": 0.12584801760474082
+    },
+    {
+      "module": "model.layers.25.self_attn.q_proj",
+      "preservation_error": 9.724169351404712e-08,
+      "orthogonality_before": 2.720315152050835,
+      "orthogonality_after": 9.070052876366353e-09,
+      "A_old_norm": 0.5731355900809498,
+      "A_new_norm": 2.8284271243769687,
+      "B_old_norm": 0.4922133840114525,
+      "B_new_norm": 0.21329882078077458
+    },
+    {
+      "module": "model.layers.25.self_attn.v_proj",
+      "preservation_error": 7.804385193763278e-08,
+      "orthogonality_before": 2.719894928678234,
+      "orthogonality_after": 7.898994580891243e-09,
+      "A_old_norm": 0.5773172679807588,
+      "A_new_norm": 2.8284271237732685,
+      "B_old_norm": 0.26067198484120524,
+      "B_new_norm": 0.11692221920646195
+    },
+    {
+      "module": "model.layers.26.self_attn.q_proj",
+      "preservation_error": 1.0168418572877556e-07,
+      "orthogonality_before": 2.720586812632776,
+      "orthogonality_after": 6.495532013445069e-09,
+      "A_old_norm": 0.5801921859952024,
+      "A_new_norm": 2.8284271256025026,
+      "B_old_norm": 0.5062743985221533,
+      "B_new_norm": 0.24301497961076246
+    },
+    {
+      "module": "model.layers.26.self_attn.v_proj",
+      "preservation_error": 4.0462168437872077e-08,
+      "orthogonality_before": 2.71270139707742,
+      "orthogonality_after": 8.409480209524456e-09,
+      "A_old_norm": 0.60946298278288,
+      "A_new_norm": 2.8284271265478016,
+      "B_old_norm": 0.2748094251519905,
+      "B_new_norm": 0.145573046764637
+    },
+    {
+      "module": "model.layers.27.self_attn.q_proj",
+      "preservation_error": 1.1908076701000409e-07,
+      "orthogonality_before": 2.768367462147254,
+      "orthogonality_after": 6.379546011566366e-09,
+      "A_old_norm": 0.4204844277847198,
+      "A_new_norm": 2.828427125067675,
+      "B_old_norm": 0.4762549008991498,
+      "B_new_norm": 0.15951633838990625
+    },
+    {
+      "module": "model.layers.27.self_attn.v_proj",
+      "preservation_error": 7.943148033939044e-08,
+      "orthogonality_before": 2.7087174048627842,
+      "orthogonality_after": 9.011749566756813e-09,
+      "A_old_norm": 0.6317086315944491,
+      "A_new_norm": 2.8284271235909424,
+      "B_old_norm": 0.281080578686382,
+      "B_new_norm": 0.16581448707897362
+    },
+    {
+      "module": "model.layers.28.self_attn.q_proj",
+      "preservation_error": 1.0506030458661729e-07,
+      "orthogonality_before": 2.7525467303865163,
+      "orthogonality_after": 7.545213518490712e-09,
+      "A_old_norm": 0.4750561456090784,
+      "A_new_norm": 2.828427125481749,
+      "B_old_norm": 0.48560310004435575,
+      "B_new_norm": 0.18080404391507135
+    },
+    {
+      "module": "model.layers.28.self_attn.v_proj",
+      "preservation_error": 4.6568595483171156e-08,
+      "orthogonality_before": 2.7138481125338862,
+      "orthogonality_after": 7.221684745135237e-09,
+      "A_old_norm": 0.6021615904147711,
+      "A_new_norm": 2.828427123897037,
+      "B_old_norm": 0.2728448412748427,
+      "B_new_norm": 0.1385567251017277
+    },
+    {
+      "module": "model.layers.29.self_attn.q_proj",
+      "preservation_error": 8.934583068694169e-08,
+      "orthogonality_before": 2.7754565846367956,
+      "orthogonality_after": 6.334684735990034e-09,
+      "A_old_norm": 0.3919063686415283,
+      "A_new_norm": 2.8284271259444593,
+      "B_old_norm": 0.4879690529428571,
+      "B_new_norm": 0.13510781786161466
+    },
+    {
+      "module": "model.layers.29.self_attn.v_proj",
+      "preservation_error": 4.657301366807063e-08,
+      "orthogonality_before": 2.694527585834151,
+      "orthogonality_after": 7.660273966354367e-09,
+      "A_old_norm": 0.6597162636169942,
+      "A_new_norm": 2.828427123207926,
+      "B_old_norm": 0.2843072263653046,
+      "B_new_norm": 0.14964417018157183
+    },
+    {
+      "module": "model.layers.30.self_attn.q_proj",
+      "preservation_error": 8.049988127014297e-08,
+      "orthogonality_before": 2.724868227971629,
+      "orthogonality_after": 6.446536840524467e-09,
+      "A_old_norm": 0.5761315386376191,
+      "A_new_norm": 2.8284271238831145,
+      "B_old_norm": 0.5011571730732648,
+      "B_new_norm": 0.26178205371526986
+    },
+    {
+      "module": "model.layers.30.self_attn.v_proj",
+      "preservation_error": 7.745256826905599e-08,
+      "orthogonality_before": 2.710608589417073,
+      "orthogonality_after": 7.921985174801817e-09,
+      "A_old_norm": 0.609387017585896,
+      "A_new_norm": 2.8284271228321143,
+      "B_old_norm": 0.29435503813059954,
+      "B_new_norm": 0.14824706386496234
+    },
+    {
+      "module": "model.layers.31.self_attn.q_proj",
+      "preservation_error": 1.0718160970505314e-07,
+      "orthogonality_before": 2.747359397309825,
+      "orthogonality_after": 4.232112206283003e-09,
+      "A_old_norm": 0.48777465385237434,
+      "A_new_norm": 2.8284271244425097,
+      "B_old_norm": 0.5080441390408613,
+      "B_new_norm": 0.16486600141395183
+    },
+    {
+      "module": "model.layers.31.self_attn.v_proj",
+      "preservation_error": 6.845422150895233e-08,
+      "orthogonality_before": 2.723771549449994,
+      "orthogonality_after": 7.195667244465967e-09,
+      "A_old_norm": 0.575638803880826,
+      "A_new_norm": 2.82842712476362,
+      "B_old_norm": 0.28731987032475176,
+      "B_new_norm": 0.14398223340434854
+    }
+  ]
+}

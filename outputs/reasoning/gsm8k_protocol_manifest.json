@@ -1,0 +1,39 @@
+{
+  "protocol": "gsm8k_response_pca_qr_matched_v1",
+  "model": "meta-llama/Llama-3.1-8B",
+  "task": "GSM8K completion-only SFT",
+  "n_train": 128,
+  "full_eval_examples": 1319,
+  "rank": 8,
+  "alpha": 16,
+  "targets": [
+    "q_proj",
+    "v_proj"
+  ],
+  "epochs": 15,
+  "pivot_epoch": 3,
+  "batch_size": 4,
+  "gradient_accumulation": 2,
+  "effective_batch_size": 8,
+  "base_learning_rate": 0.0002,
+  "weight_decay": 0.01,
+  "scheduler": "linear",
+  "warmup_steps": 0,
+  "pca_source": "mean-pooled hidden states at positions predicting supervised response tokens",
+  "pca_random_rotation": false,
+  "eigenvalue_learning_rates": false,
+  "differential_B_learning_rate": false,
+  "pivot": "FP64 output-preserving reduced QR",
+  "pivot_optimizer_reset": [
+    "A",
+    "B"
+  ],
+  "post_pivot_lr_override": false,
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "max_sequence_length": 512,
+  "max_new_tokens": 512
+}

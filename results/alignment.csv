@@ -1,0 +1,8 @@
+task,rho,rho_cross_split,fisher_ratio,pivotlora_gain,metric,source
+agnews,0.843,0.390,0.14,0.194,accuracy,paper_table_app-rho-gain
+sst2,0.667,0.285,0.02,0.143,accuracy,paper_table_app-rho-gain
+cola,0.530,0.259,0.02,0.125,matthews_correlation,paper_table_app-rho-gain
+qnli,0.458,,0.02,0.039,accuracy,paper_table_app-rho-gain
+mnli,0.419,,0.03,0.001,accuracy,paper_table_app-rho-gain
+boolq,0.402,,0.01,0.016,accuracy,paper_table_app-rho-gain
+rte,0.293,,0.01,0.018,accuracy,paper_table_app-rho-gain

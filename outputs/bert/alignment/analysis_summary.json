@@ -1,0 +1,234 @@
+{
+  "configuration": {
+    "model": "bert-base-uncased",
+    "device": "cpu",
+    "max_seq_len": 128,
+    "rank": 8,
+    "pca_solver": "full",
+    "requested_shots": 64,
+    "subset_seeds": [
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51
+    ],
+    "imbalance_repeats": 30,
+    "imbalance_profiles": {
+      "balanced": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "moderate": [
+        28,
+        16,
+        12,
+        8
+      ],
+      "severe": [
+        40,
+        12,
+        8,
+        4
+      ]
+    },
+    "provisional_alpha_indicator": 0.6
+  },
+  "subset_sensitivity": [
+    {
+      "task": "SST-2",
+      "num_subsets": 10,
+      "mean_alpha": 0.673122658710207,
+      "std_alpha": 0.18546127171438465,
+      "minimum_alpha": 0.19092952291898918,
+      "percentile_10": 0.543538037307274,
+      "median_alpha": 0.7393984075594842,
+      "percentile_90": 0.7894682108085066,
+      "maximum_alpha": 0.8242432565681821,
+      "fraction_alpha_ge_0.6": 0.8,
+      "count_alpha_ge_0.6": 8,
+      "provisional_indicator": 0.6,
+      "paper_alpha": 0.667,
+      "pivot_gain_fraction": 0.143,
+      "pivot_gain_percentage_points": 14.299999999999999
+    },
+    {
+      "task": "AG News",
+      "num_subsets": 10,
+      "mean_alpha": 0.8425315748262788,
+      "std_alpha": 0.017070181399273004,
+      "minimum_alpha": 0.8233037782421216,
+      "percentile_10": 0.8242943483241996,
+      "median_alpha": 0.8389207084825991,
+      "percentile_90": 0.869873212882664,
+      "maximum_alpha": 0.8744225408342075,
+      "fraction_alpha_ge_0.6": 1.0,
+      "count_alpha_ge_0.6": 10,
+      "provisional_indicator": 0.6,
+      "paper_alpha": 0.843,
+      "pivot_gain_fraction": 0.193,
+      "pivot_gain_percentage_points": 19.3
+    },
+    {
+      "task": "MNLI",
+      "num_subsets": 10,
+      "mean_alpha": 0.4442783817851642,
+      "std_alpha": 0.11957628824590848,
+      "minimum_alpha": 0.2888520216047957,
+      "percentile_10": 0.2921925216125025,
+      "median_alpha": 0.45099376455188145,
+      "percentile_90": 0.568187046267972,
+      "maximum_alpha": 0.6466691027949506,
+      "fraction_alpha_ge_0.6": 0.1,
+      "count_alpha_ge_0.6": 1,
+      "provisional_indicator": 0.6,
+      "paper_alpha": 0.419,
+      "pivot_gain_fraction": 0.001,
+      "pivot_gain_percentage_points": 0.1
+    },
+    {
+      "task": "RTE",
+      "num_subsets": 10,
+      "mean_alpha": 0.3911367937910697,
+      "std_alpha": 0.10945004508451259,
+      "minimum_alpha": 0.25527329549000033,
+      "percentile_10": 0.2566166810118427,
+      "median_alpha": 0.3739269452609447,
+      "percentile_90": 0.5444455562394399,
+      "maximum_alpha": 0.6056318207880979,
+      "fraction_alpha_ge_0.6": 0.1,
+      "count_alpha_ge_0.6": 1,
+      "provisional_indicator": 0.6,
+      "paper_alpha": 0.293,
+      "pivot_gain_fraction": 0.018,
+      "pivot_gain_percentage_points": 1.7999999999999998
+    },
+    {
+      "task": "QNLI",
+      "num_subsets": 10,
+      "mean_alpha": 0.43968434914915344,
+      "std_alpha": 0.07928720782413716,
+      "minimum_alpha": 0.3604948620204934,
+      "percentile_10": 0.38613478866434425,
+      "median_alpha": 0.39997664833748425,
+      "percentile_90": 0.5200397593500996,
+      "maximum_alpha": 0.6229338431764972,
+      "fraction_alpha_ge_0.6": 0.1,
+      "count_alpha_ge_0.6": 1,
+      "provisional_indicator": 0.6,
+      "paper_alpha": 0.458,
+      "pivot_gain_fraction": 0.039,
+      "pivot_gain_percentage_points": 3.9
+    },
+    {
+      "task": "BoolQ",
+      "num_subsets": 10,
+      "mean_alpha": 0.4574824494112531,
+      "std_alpha": 0.13660602969063926,
+      "minimum_alpha": 0.3058422265585294,
+      "percentile_10": 0.31761045107433655,
+      "median_alpha": 0.41831292323328495,
+      "percentile_90": 0.6042454059650059,
+      "maximum_alpha": 0.7492150172217116,
+      "fraction_alpha_ge_0.6": 0.1,
+      "count_alpha_ge_0.6": 1,
+      "provisional_indicator": 0.6,
+      "paper_alpha": 0.402,
+      "pivot_gain_fraction": 0.016,
+      "pivot_gain_percentage_points": 1.6
+    }
+  ],
+  "correlations": {
+    "tasks": [
+      "SST-2",
+      "AG News",
+      "MNLI",
+      "RTE",
+      "QNLI",
+      "BoolQ"
+    ],
+    "recomputed_mean_alphas": [
+      0.673122658710207,
+      0.8425315748262788,
+      0.4442783817851642,
+      0.3911367937910697,
+      0.43968434914915344,
+      0.4574824494112531
+    ],
+    "paper_alphas": [
+      0.667,
+      0.843,
+      0.419,
+      0.293,
+      0.458,
+      0.402
+    ],
+    "gains": [
+      0.143,
+      0.193,
+      0.001,
+      0.018,
+      0.039,
+      0.016
+    ],
+    "recomputed_pearson_r": 0.973391166653207,
+    "recomputed_spearman_rho": 0.5428571428571429,
+    "paper_pearson_r": 0.9592119683072204,
+    "paper_spearman_rho": 0.7714285714285715
+  },
+  "agnews_imbalance": [
+    {
+      "profile": "balanced",
+      "counts": "16/16/16/16",
+      "repeats": 30,
+      "mean_alpha": 0.8689752979670945,
+      "std_alpha": 0.0273637589411832,
+      "minimum_alpha": 0.8013335076451437,
+      "percentile_10": 0.8402374764362518,
+      "median_alpha": 0.8660681966391343,
+      "percentile_90": 0.9039081418839259,
+      "maximum_alpha": 0.9277377912108411,
+      "fraction_alpha_ge_0.6": 1.0
+    },
+    {
+      "profile": "moderate",
+      "counts": "28/16/12/8",
+      "repeats": 30,
+      "mean_alpha": 0.8664577915689335,
+      "std_alpha": 0.023626887412634752,
+      "minimum_alpha": 0.8197956757302182,
+      "percentile_10": 0.8360703673355045,
+      "median_alpha": 0.865217919700979,
+      "percentile_90": 0.8979121820303619,
+      "maximum_alpha": 0.922549085279586,
+      "fraction_alpha_ge_0.6": 1.0
+    },
+    {
+      "profile": "severe",
+      "counts": "40/12/8/4",
+      "repeats": 30,
+      "mean_alpha": 0.8183738242289442,
+      "std_alpha": 0.028067015638655934,
+      "minimum_alpha": 0.7553307341866866,
+      "percentile_10": 0.7876703737760564,
+      "median_alpha": 0.8167990122319949,
+      "percentile_90": 0.8586399259129142,
+      "maximum_alpha": 0.8780720393047324,
+      "fraction_alpha_ge_0.6": 1.0
+    }
+  ],
+  "interpretation_limits": [
+    "Variability across independently sampled few-shot subsets is reported instead of an ordinary bootstrap.",
+    "The value alpha=0.6 is a provisional empirical high-alignment indicator for the evaluated tasks, not a universal theoretical threshold.",
+    "The six-task correlations are descriptive because the number of independent tasks is small.",
+    "The imbalance experiment evaluates stability of alpha, not PivotLoRA training performance under class imbalance.",
+    "The deterministic full PCA solver computes the exact rank-r sample principal subspace and removes randomized PCA solver variability."
+  ]
+}

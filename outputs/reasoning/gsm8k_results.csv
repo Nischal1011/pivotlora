@@ -1,0 +1,7 @@
+protocol,method,seed,n_train,eval_examples,correct,gsm8k_exact_match,train_wall_time_seconds
+gsm8k_response_pca_qr_matched_v1,lora,42,128,1319,346,0.262319939,287.81
+gsm8k_response_pca_qr_matched_v1,lora,43,128,1319,306,0.231993935,284.35
+gsm8k_response_pca_qr_matched_v1,lora,44,128,1319,293,0.222137983,284.10
+gsm8k_response_pca_qr_matched_v1,pivotlora,42,128,1319,338,0.256254738,284.51
+gsm8k_response_pca_qr_matched_v1,pivotlora,43,128,1319,336,0.254738438,291.22
+gsm8k_response_pca_qr_matched_v1,pivotlora,44,128,1319,330,0.250189538,284.48

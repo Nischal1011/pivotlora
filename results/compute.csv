@@ -1,0 +1,17 @@
+model,task,n,method,wall_time_seconds,wall_time_is_approximate,peak_memory_mb,peak_memory_gb,overhead_vs_lora_seconds,overhead_vs_lora_pct,hardware,source
+bert-base-uncased,sst2,64,LoRA,69.4,false,1266,,,,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,DoRA,69.5,false,1399,,0.1,0.2,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,AdaLoRA,102.2,false,1264,,32.9,47.4,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,PiSSA,68.6,false,1267,,-0.8,-1.2,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,LoRA-GA,68.0,false,1272,,-1.4,-1.9,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,LoRA-One,69.0,false,1272,,-0.4,-0.6,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,LoRA+,68.9,false,1267,,-0.5,-0.7,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,EVA,69.8,false,1267,,0.4,0.6,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,LoRAM,68.9,false,1267,,-0.5,-0.7,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,SRLoRA,89.4,false,1267,,20.0,28.8,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,TT-PCA,73.6,false,1267,,4.2,6.0,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,TT-LDA,69.3,false,1267,,-0.1,-0.1,NVIDIA T4,paper_table_app-cost-bert
+bert-base-uncased,sst2,64,PivotLoRA,73.4,false,1268,,4.0,5.8,NVIDIA T4,paper_table_app-cost-bert
+LLaMA-2-7B,sst2,64,LoRA,74,true,,14.6,,,NVIDIA L4 (bf16),paper_table_app-cost-llama
+LLaMA-2-7B,sst2,64,PiSSA,73,true,,14.6,,,NVIDIA L4 (bf16),paper_table_app-cost-llama
+LLaMA-2-7B,sst2,64,PivotLoRA,73,true,,14.6,,,NVIDIA L4 (bf16),paper_table_app-cost-llama

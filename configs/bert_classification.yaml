@@ -1,0 +1,73 @@
+# Primary controlled BERT-base few-shot classification protocol.
+# Reproduces: results/bert_main.csv, results/bert_aggregate.csv
+# Paper: Table 1 (main), Appendix "Complete BERT-Base Results" / "Full Aggregate Rankings"
+# Entry point: python src/train_classification.py
+
+experiment: bert_classification
+script: src/train_classification.py
+
+model:
+  checkpoint: bert-base-uncased
+  precision: fp16
+  classification_head: trained jointly with the adapters; initialization matched
+    across methods and seeds; excluded from the reported adapter parameter count
+
+adapter:
+  rank: 8                       # r
+  lora_alpha: 16                # alpha; alpha/r = 2
+  target_modules:               # 12 layers x 2 = 24 adapters
+    - attention.self.query
+    - attention.self.value
+  trainable_adapter_parameters: ~0.30M
+
+optimization:
+  optimizer: adamw
+  base_learning_rate: 2.0e-4    # eta_A, the shared protocol anchor
+  epochs: 15
+  batch_size: 16
+  max_sequence_length: 128
+
+# Eigenvalue-scaled per-rank learning rates for B (classification only).
+#   eta_{B,i} = (lambda_i / mean(lambda)) * lambda_ratio * eta_A
+# Normalizing by the mean eigenvalue fixes the average B-to-A ratio at 16,
+# matching the LoRA+ scale. This is an optimizer heuristic, not part of the
+# activation-subspace definition.
+learning_rate_allocation:
+  scheme: eigenvalue_scaled
+  lambda_ratio: 16
+
+initialization:
+  activation_source: target_position    # the [CLS] representation
+  statistic: pca                        # TT-LDA is the supervised ablation
+  basis_scale: 1.0
+  init_B: zeros                         # so Delta_W = 0 at initialization
+
+pivot:
+  enabled: true
+  epoch: 3                              # K
+  decomposition: reduced QR of A^T, computed in float64
+  reencode_B: true                      # B_new = B A (A_new)^T
+  optimizer_state_reset: [A]            # B moments are RETAINED
+  post_pivot_b_lr_warmup_steps: 10      # transition to the uniform rate 16 * eta_A
+
+data:
+  tasks: [sst2, cola, mnli, qnli, rte, agnews]
+  n_labeled: [16, 32, 64, 128, 256]     # total examples, approximately class-balanced
+  sampling: see manifests/bert/ for the exact selected indices
+  eval_split:
+    sst2: validation
+    cola: validation
+    mnli: validation_matched
+    qnli: validation
+    rte: validation
+    agnews: test
+
+seeds: [42, 43, 44]
+
+determinism:
+  torch_use_deterministic_algorithms: true
+  cudnn_deterministic: true
+  cudnn_benchmark: false
+
+hardware:
+  gpu: NVIDIA T4 (16 GB)

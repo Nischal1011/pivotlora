@@ -1,0 +1,54 @@
+# Learning-rate sensitivity sweep (the "tuned comparison").
+# Reproduces: results/tuned_comparison.csv
+# Paper: Appendix "Learning-rate sensitivity" (Tables lr-sensitivity, lr-best)
+# Entry points:
+#   python src/lr_sweep.py --probe        # import the harness, no training
+#   python src/lr_sweep.py --aggregate    # summarize existing sweep outputs
+#
+# A separate diagnostic sweep, not the primary benchmark: absolute scores need
+# not match results/bert_main.csv, and comparisons are within the sweep. Only
+# the summary is published.
+
+experiment: lr_sweep
+script: src/lr_sweep.py
+
+model:
+  checkpoint: bert-base-uncased
+
+adapter:
+  rank: 8
+  lora_alpha: 16
+  target_modules:
+    - attention.self.query
+    - attention.self.value
+
+optimization:
+  optimizer: adamw
+  epochs: 15
+  batch_size: 16
+
+sweep:
+  base_learning_rate_grid: [5.0e-5, 2.0e-4, 8.0e-4]
+  primary_anchor: 2.0e-4
+  # LoRA+ selection additionally ranges over its differential ratio.
+  lora_plus_ratio_grid: [4, 8, 16, 32]
+  selection: best three-seed mean per task and method configuration
+
+pivot:
+  enabled: true                 # for PivotLoRA rows
+  epoch: 3
+  optimizer_state_reset: [A]
+  post_pivot_b_lr_warmup_steps: 10
+
+data:
+  tasks: [agnews, sst2, cola]
+  n_labeled: [64]
+
+methods: [lora, lora_plus, pissa, loram, eva, tt_pca, pivotlora]
+seeds: [42, 43, 44]
+
+interpretation: >-
+  Tuning narrows several shared-protocol margins, especially on AG News, but
+  PivotLoRA remains strongest on average among the swept methods (0.667 vs.
+  0.655 for TT-PCA and 0.622 for LoRA). This is sensitivity analysis: the
+  baselines are not each independently tuned.

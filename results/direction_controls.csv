@@ -1,0 +1,16 @@
+experiment_group,variant,task,n,mean,std,num_seeds,source
+direction_lr_control,LoRA,agnews,64,0.640,0.033,3,paper_table_direction-lr-controls
+direction_lr_control,LoRA,sst2,64,0.647,0.040,3,paper_table_direction-lr-controls
+direction_lr_control,LoRA,cola,64,0.188,0.042,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA,agnews,64,0.751,0.025,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA,sst2,64,0.769,0.038,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA,cola,64,0.268,0.092,3,paper_table_direction-lr-controls
+direction_lr_control,Random+EigenLR,agnews,64,0.444,0.268,3,paper_table_direction-lr-controls
+direction_lr_control,Random+EigenLR,sst2,64,0.571,0.031,3,paper_table_direction-lr-controls
+direction_lr_control,Random+EigenLR,cola,64,0.028,0.035,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA+UniformLR,agnews,64,0.752,0.019,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA+UniformLR,sst2,64,0.769,0.035,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA+UniformLR,cola,64,0.276,0.100,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA+ShuffledLR,agnews,64,0.754,0.028,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA+ShuffledLR,sst2,64,0.765,0.028,3,paper_table_direction-lr-controls
+direction_lr_control,TT-PCA+ShuffledLR,cola,64,0.281,0.088,3,paper_table_direction-lr-controls

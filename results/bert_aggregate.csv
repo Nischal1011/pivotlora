@@ -1,0 +1,14 @@
+method,average_rank,settings_better_than_pivotlora,num_settings,source
+PivotLoRA,1.83,,30,paper_table_app-fullrankings
+TT-LDA,3.13,5,30,paper_table_app-fullrankings
+TT-PCA,3.77,3,30,paper_table_app-fullrankings
+LoRA,5.23,1,30,paper_table_app-fullrankings
+DoRA,5.83,1,30,paper_table_app-fullrankings
+SRLoRA,6.93,1,30,paper_table_app-fullrankings
+LoRA+,8.43,5,30,paper_table_app-fullrankings
+LoRAM,8.43,1,30,paper_table_app-fullrankings
+LoRA-One,8.47,2,30,paper_table_app-fullrankings
+EVA,8.47,2,30,paper_table_app-fullrankings
+LoRA-GA,9.30,1,30,paper_table_app-fullrankings
+PiSSA,9.87,1,30,paper_table_app-fullrankings
+AdaLoRA,11.30,0,30,paper_table_app-fullrankings

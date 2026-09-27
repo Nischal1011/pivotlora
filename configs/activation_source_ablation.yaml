@@ -1,0 +1,76 @@
+# Matched target-position vs. all-token activation-source ablation.
+# Reproduces: results/activation_source.csv
+# Paper: Appendix "Activation-Source Ablation"
+# Entry points:
+#   python src/activation_source_ablation.py --probe        # no training
+#   python src/activation_source_ablation.py --aggregate    # summarize outputs
+#   python src/activation_source_minimal_ablation.py        # the two-condition grid
+#
+# Run as an independent matched comparison in a separate environment, so the
+# paired within-seed differences -- not the absolute values -- are what compare
+# against the primary benchmark.
+
+experiment: activation_source_ablation
+scripts:
+  - src/activation_source_ablation.py
+  - src/activation_source_minimal_ablation.py
+
+model:
+  checkpoint: bert-base-uncased
+
+adapter:
+  rank: 8
+  lora_alpha: 16
+  target_modules:
+    - attention.self.query
+    - attention.self.value
+
+optimization:
+  optimizer: adamw
+  base_learning_rate: 2.0e-4
+  epochs: 15
+  batch_size: 16
+
+learning_rate_allocation:
+  scheme: eigenvalue_scaled
+  lambda_ratio: 16
+
+pivot:
+  enabled: true
+  epoch: 3
+  optimizer_state_reset: [A]
+  post_pivot_b_lr_warmup_steps: 10
+
+# The only factor varied. Sampled examples, rank, scale, learning-rate
+# allocation, pivot timing, optimizer-state policy, and training budget are
+# fixed within each paired seed. The same source feeds the query and value
+# adapters.
+conditions:
+  - name: target_position
+    description: one [CLS] activation per example
+    vectors_per_layer:
+      agnews: 64
+      sst2: 64
+    top8_explained_variance_ratio:
+      agnews: 0.5588
+      sst2: 0.6775
+  - name: all_token
+    description: all non-padding token activations
+    vectors_per_layer:
+      agnews: 3397.7    # mean across layers/seeds
+      sst2: 830.7
+    top8_explained_variance_ratio:
+      agnews: 0.1514
+      sst2: 0.2116
+
+data:
+  tasks: [agnews, sst2]
+  n_labeled: [64]
+
+seeds: [42, 43, 44]
+
+interpretation: >-
+  All-token initialization has the higher mean on both tasks here (+3.15 pp on
+  AG News, +2.33 pp on SST-2), illustrating the alignment--estimation
+  trade-off. Two tasks and three seeds; the SST-2 difference is small relative
+  to the seed variation.

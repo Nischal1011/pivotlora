@@ -1,0 +1,15 @@
+task,n,method,mean,std,num_seeds,mean_gain_vs_lora,bootstrap_ci_low,bootstrap_ci_high,source
+agnews,16,LoRA,0.397,0.044,5,,,,paper_five-seed-confirmation
+agnews,16,PivotLoRA,0.577,0.035,5,0.180,0.145,0.217,paper_five-seed-confirmation
+agnews,32,LoRA,0.490,0.016,5,,,,paper_five-seed-confirmation
+agnews,32,PivotLoRA,0.721,0.047,5,0.231,0.191,0.265,paper_five-seed-confirmation
+agnews,64,LoRA,0.650,0.032,5,,,,paper_five-seed-confirmation
+agnews,64,PivotLoRA,0.816,0.022,5,0.166,0.128,0.205,paper_five-seed-confirmation
+sst2,32,LoRA,0.525,0.026,5,,,,paper_five-seed-confirmation
+sst2,32,PivotLoRA,0.615,0.064,5,0.090,0.056,0.125,paper_five-seed-confirmation
+sst2,64,LoRA,0.655,0.032,5,,,,paper_five-seed-confirmation
+sst2,64,PivotLoRA,0.790,0.022,5,0.135,0.112,0.156,paper_five-seed-confirmation
+cola,64,LoRA,0.148,0.061,5,,,,paper_five-seed-confirmation
+cola,64,PivotLoRA,0.265,0.095,5,0.117,0.070,0.169,paper_five-seed-confirmation
+qnli,64,LoRA,0.564,0.035,5,,,,paper_five-seed-confirmation
+qnli,64,PivotLoRA,0.596,0.037,5,0.032,0.010,0.047,paper_five-seed-confirmation

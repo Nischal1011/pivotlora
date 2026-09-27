@@ -1,0 +1,13 @@
+task,shot,source,seed,lr,epochs,score,metric,wall_s,peak_memory_mb,pivot_done,provenance
+agnews,64,target_only,42,0.0002,15,0.8301315789473684,accuracy,1556.3830248997547,1490.6875,True,reused_existing_artifact
+agnews,64,target_only,43,0.0002,15,0.8115789473684211,accuracy,432.2332830000669,1490.6875,True,reused_existing_artifact
+agnews,64,target_only,44,0.0002,15,0.7997368421052632,accuracy,327.1703149001114,1490.6875,True,reused_existing_artifact
+agnews,64,all_token,42,0.0002,15,0.8443421052631579,accuracy,1630.5204996000975,1490.6875,True,reused_existing_artifact
+agnews,64,all_token,43,0.0002,15,0.8536842105263158,accuracy,430.310162300244,1490.6875,True,reused_existing_artifact
+agnews,64,all_token,44,0.0002,15,0.8380263157894737,accuracy,326.3573749996722,1490.6875,True,reused_existing_artifact
+sst2,64,target_only,42,0.0002,15,0.8325688073394495,accuracy,53.16979640023783,1490.669921875,True,reused_existing_artifact
+sst2,64,target_only,43,0.0002,15,0.7935779816513762,accuracy,53.62452459987253,1490.669921875,True,reused_existing_artifact
+sst2,64,target_only,44,0.0002,15,0.7087155963302753,accuracy,57.1427989997901,1490.669921875,True,reused_existing_artifact
+sst2,64,all_token,42,0.0002,15,0.8211009174311926,accuracy,56.301030199974775,1490.669921875,True,reused_existing_artifact
+sst2,64,all_token,43,0.0002,15,0.8371559633027523,accuracy,52.50897900015116,1490.669921875,True,reused_existing_artifact
+sst2,64,all_token,44,0.0002,15,0.7465596330275229,accuracy,55.59081370010972,1490.669921875,True,reused_existing_artifact

@@ -1,0 +1,17 @@
+task,n,source,seed,score,mean,std,num_seeds,paired_gain_vs_target,seed_level_wins,num_vectors_per_layer,top8_explained_variance_ratio,source_file
+agnews,64,target_position,42,0.8301315789473684,,,,,,64,0.5588,results_activation_source_minimal/activation_source_minimal_raw.csv
+agnews,64,target_position,43,0.8115789473684211,,,,,,64,0.5588,results_activation_source_minimal/activation_source_minimal_raw.csv
+agnews,64,target_position,44,0.7997368421052632,,,,,,64,0.5588,results_activation_source_minimal/activation_source_minimal_raw.csv
+agnews,64,all_token,42,0.8443421052631579,,,,,,3397.7,0.1514,results_activation_source_minimal/activation_source_minimal_raw.csv
+agnews,64,all_token,43,0.8536842105263158,,,,,,3397.7,0.1514,results_activation_source_minimal/activation_source_minimal_raw.csv
+agnews,64,all_token,44,0.8380263157894737,,,,,,3397.7,0.1514,results_activation_source_minimal/activation_source_minimal_raw.csv
+sst2,64,target_position,42,0.8325688073394495,,,,,,64,0.6775,results_activation_source_minimal/activation_source_minimal_raw.csv
+sst2,64,target_position,43,0.7935779816513762,,,,,,64,0.6775,results_activation_source_minimal/activation_source_minimal_raw.csv
+sst2,64,target_position,44,0.7087155963302753,,,,,,64,0.6775,results_activation_source_minimal/activation_source_minimal_raw.csv
+sst2,64,all_token,42,0.8211009174311926,,,,,,830.7,0.2116,results_activation_source_minimal/activation_source_minimal_raw.csv
+sst2,64,all_token,43,0.8371559633027523,,,,,,830.7,0.2116,results_activation_source_minimal/activation_source_minimal_raw.csv
+sst2,64,all_token,44,0.7465596330275229,,,,,,830.7,0.2116,results_activation_source_minimal/activation_source_minimal_raw.csv
+agnews,64,target_position,,,0.814,0.015,3,,,64,0.5588,paper_table_activation-source
+agnews,64,all_token,,,0.845,0.008,3,0.0315,3/3,3397.7,0.1514,paper_table_activation-source
+sst2,64,target_position,,,0.778,0.063,3,,,64,0.6775,paper_table_activation-source
+sst2,64,all_token,,,0.802,0.048,3,0.0233,2/3,830.7,0.2116,paper_table_activation-source

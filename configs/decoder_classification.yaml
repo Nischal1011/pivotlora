@@ -1,0 +1,71 @@
+# Decoder-scale few-shot classification.
+# Reproduces: results/decoder_classification.csv
+# Paper: Table 2 (main), Appendix "Decoder-Scale Classification Results"
+# Entry points:
+#   python src/train_decoder_classification.py --model llama3.1-8b
+#   python src/train_decoder_classification.py --model llama2-7b
+#
+# One script serves both backbones: the protocol below is identical for each
+# and only the checkpoint changes. Each backbone writes its own
+# results_decoder_<checkpoint>.csv, because the resume key
+# (task, shot, method, seed) does not include the model.
+
+experiment: decoder_classification
+script: src/train_decoder_classification.py
+
+model:
+  # Selected with --model; aliases expand to these checkpoints.
+  default_checkpoint: meta-llama/Llama-3.1-8B
+  checkpoints:
+    llama3.1-8b: meta-llama/Llama-3.1-8B
+    llama2-7b: meta-llama/Llama-2-7b-hf
+  precision: bf16
+  head: sequence-classification head trained jointly with the adapters
+
+adapter:
+  rank: 8
+  lora_alpha: 16
+  target_modules:                       # 32 layers x 2 = 64 adapters
+    - self_attn.q_proj
+    - self_attn.v_proj
+
+optimization:
+  optimizer: adamw
+  base_learning_rate: 2.0e-4
+  epochs: 15
+  per_device_batch_size: 4
+  gradient_accumulation_steps: 4
+  effective_batch_size: 16
+  max_sequence_length:
+    sst2: 128
+    agnews: 128
+    boolq: 192
+
+learning_rate_allocation:
+  scheme: eigenvalue_scaled
+  lambda_ratio: 16
+
+initialization:
+  activation_source: sequence representation consumed by the classification head
+  statistic: pca
+  basis_scale: 1.0
+  init_B: zeros
+
+pivot:
+  enabled: true
+  epoch: 3
+  decomposition: reduced QR
+  optimizer_state_reset: [A]
+  post_pivot_b_lr_warmup_steps: 10
+
+data:
+  tasks: [sst2, agnews]                 # boolq additionally for Llama-3.1-8B
+  n_labeled: [64, 256]
+  sentence_pair_handling: fields concatenated before tokenization
+
+methods: [lora, pivotlora, pissa, loram]
+seeds: [42, 43, 44]
+
+hardware:
+  gpu: NVIDIA L4 (24 GB)
+  representative_peak_memory: ~14.6 GB

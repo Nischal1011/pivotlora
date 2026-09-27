@@ -1,0 +1,41 @@
+# Environments
+.venv/
+venv/
+env/
+.python-version
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Secrets -- never commit these
+.env
+.env.*
+*.key
+*.pem
+.huggingface/
+hf_token*
+wandb/
+
+# Local run output. The scripts write here; the committed artifacts live in
+# outputs/ and the published summaries in results/.
+*.log
+!outputs/**/*.log
+checkpoints/
+runs/
+tmp/
+cache/
+results_*/
+predictions_*/
+pivot_diagnostics_*/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.ipynb_checkpoints/
