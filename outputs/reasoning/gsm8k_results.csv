@@ -1,7 +1,8 @@
-protocol,method,seed,n_train,eval_examples,correct,gsm8k_exact_match,train_wall_time_seconds
-gsm8k_response_pca_qr_matched_v1,lora,42,128,1319,346,0.262319939,287.81
-gsm8k_response_pca_qr_matched_v1,lora,43,128,1319,306,0.231993935,284.35
-gsm8k_response_pca_qr_matched_v1,lora,44,128,1319,293,0.222137983,284.10
-gsm8k_response_pca_qr_matched_v1,pivotlora,42,128,1319,338,0.256254738,284.51
-gsm8k_response_pca_qr_matched_v1,pivotlora,43,128,1319,336,0.254738438,291.22
-gsm8k_response_pca_qr_matched_v1,pivotlora,44,128,1319,330,0.250189538,284.48
+protocol,method,seed,n_train,eval_examples,correct,gsm8k_exact_match,parse_rate,format_compliance,train_wall_time_seconds,predictions_file
+gsm8k_response_pca_qr_matched_v2,base,42,128,1319,338,0.256254738,1.000000000,0.000000000,0.00,predictions_gsm8k_response_matched_v2\gsm8k_response_pca_qr_matched_v2_base_seed_42.jsonl
+gsm8k_response_pca_qr_matched_v2,lora,42,128,1319,376,0.285064443,1.000000000,0.979529947,282.01,predictions_gsm8k_response_matched_v2\gsm8k_response_pca_qr_matched_v2_lora_seed_42.jsonl
+gsm8k_response_pca_qr_matched_v2,lora,43,128,1319,381,0.288855193,1.000000000,0.959818044,281.77,predictions_gsm8k_response_matched_v2\gsm8k_response_pca_qr_matched_v2_lora_seed_43.jsonl
+gsm8k_response_pca_qr_matched_v2,lora,44,128,1319,378,0.286580743,1.000000000,0.957543594,2353.67,predictions_gsm8k_response_matched_v2\gsm8k_response_pca_qr_matched_v2_lora_seed_44.jsonl
+gsm8k_response_pca_qr_matched_v2,pivotlora,42,128,1319,421,0.319181198,1.000000000,0.981804397,365.73,predictions_gsm8k_response_matched_v2\gsm8k_response_pca_qr_matched_v2_pivotlora_seed_42.jsonl
+gsm8k_response_pca_qr_matched_v2,pivotlora,43,128,1319,476,0.360879454,1.000000000,0.976497346,283.02,predictions_gsm8k_response_matched_v2\gsm8k_response_pca_qr_matched_v2_pivotlora_seed_43.jsonl
+gsm8k_response_pca_qr_matched_v2,pivotlora,44,128,1319,418,0.316906748,1.000000000,0.974222896,283.11,predictions_gsm8k_response_matched_v2\gsm8k_response_pca_qr_matched_v2_pivotlora_seed_44.jsonl

@@ -5,7 +5,7 @@ This module is a dependency-light, self-contained extraction of the two
 operations that define PivotLoRA. It is the reference implementation that the
 unit tests in ``tests/test_pivot.py`` exercise. The full training harnesses
 (``train_classification.py``, ``train_reasoning_gsm8k.py``,
-``train_reasoning_svamp.py``) contain the same algebra inline, wrapped in the
+``train_reasoning_strategyqa.py``) contain the same algebra inline, wrapped in the
 Hugging Face ``Trainer`` callbacks that were actually used to produce the
 reported numbers; this file exists so that the method itself can be read and
 verified without reading a training loop.
@@ -105,6 +105,17 @@ def orthogonality_error(A: torch.Tensor, columns: bool = True) -> float:
 # ---------------------------------------------------------------------------
 
 
+def experiment_basis_scale(input_dim: int) -> float:
+    """Basis scale used in every reported experiment: ``sqrt(5 / d)``.
+
+    The training scripts multiply the orthonormal PCA basis by this factor
+    inside the LoRA layer (Eq. 7). It gives ``A`` a Frobenius norm of
+    ``sqrt(5 r / d)``, smaller than Kaiming-uniform initialization, so it is
+    not norm-matched to vanilla LoRA.
+    """
+    return float(np.sqrt(5.0 / input_dim))
+
+
 def pca_initialization(
     activations: np.ndarray | torch.Tensor,
     rank: int,
@@ -122,10 +133,11 @@ def pca_initialization(
     rank
         LoRA rank ``r``. Reported experiments use ``r = 8``.
     basis_scale
-        Multiplier applied to the orthonormal basis. Classification uses
-        ``1.0``; the GSM8K and SVAMP experiments use ``sqrt(5) ~= 2.2360680``,
-        which is *not* norm-matched to Kaiming-uniform initialization (see
-        Appendix "Training and Pivot Configuration").
+        Multiplier applied to the orthonormal basis. The default ``1.0``
+        returns the orthonormal basis itself. To reproduce the reported
+        experiments, pass ``experiment_basis_scale(d)``, i.e. ``sqrt(5 / d)``;
+        the classification scripts additionally rotate the basis by a fixed
+        random ``r x r`` orthogonal matrix, which leaves its span unchanged.
     rows_are_directions
         ``False`` (default) returns ``d x r`` with directions in the columns,
         matching the released training code. ``True`` returns ``r x d``,
@@ -350,8 +362,8 @@ def eigenvalue_scaled_b_rates(
     Normalizing by the mean eigenvalue makes the average B-to-A learning-rate
     ratio equal to ``lambda_ratio`` (16, matching the LoRA+ scale). This is an
     optimizer heuristic, not part of the activation-subspace definition; the
-    direction-versus-rate controls in the paper separate the two. The GSM8K and
-    SVAMP experiments do not use it.
+    direction-versus-rate controls in the paper separate the two. The reasoning
+    experiments do not use it.
     """
     values = np.asarray(list(eigenvalues), dtype=np.float64)
     if values.size == 0:

@@ -7,21 +7,19 @@ actually produced.
 Superseded runs, smoke tests, and the raw 243-run learning-rate sweep are not
 included.
 
-## `reasoning/` — GSM8K and SVAMP
+## `reasoning/` — GSM8K and StrategyQA
 
 | File | Contents |
 |---|---|
-| `gsm8k_results.csv`, `svamp_results.csv` | per-seed accuracy, correct counts, wall time |
-| `gsm8k_protocol_manifest.json`, `svamp_protocol_manifest.json` | the frozen protocol as recorded at run time |
-| `pivot_diagnostics/{gsm8k,svamp}_seed_{42,43,44}.json` | per-adapter preservation and orthogonality errors for all 64 adapters |
-| `predictions/svamp_{lora,pivotlora}_seed_{42,43,44}.jsonl` | every SVAMP test prediction, one record per example |
-| `logs/{gsm8k,svamp}_full_run.log` | full run logs, including the hardware banner and SVAMP's sampled IDs |
+| `{gsm8k,strategyqa}_results.csv` | per-run accuracy, correct counts, parse rate, format compliance, wall time; includes the base-model reference |
+| `{gsm8k,strategyqa}_protocol_manifest.json` | the protocol as recorded at run time, including the prompt and completion templates |
+| `pivot_diagnostics/{dataset}_seed_{42,43,44}.json` | per-adapter preservation and orthogonality errors for all 64 adapters |
+| `predictions/{dataset}_{base,lora,pivotlora}*.jsonl` | every test prediction, one record per example, with format-compliance flags |
+| `logs/` | full run logs, including the hardware banner and sampled IDs. `gsm8k_full_run_attempt1_gpu_error.log` is a first attempt that stopped on a CUDA error while the GPU was shared with another process; the study resumed from the completed runs. `strategyqa_screening_run.log` is the base + LoRA screening run, whose rows the full study reuses. |
+| `superseded_v1/` | the originally released reasoning outputs, produced with the `"Answer: "` prompt boundary described in the main README. Kept for transparency; not used in the paper. |
 
-These reproduce the paper's reasoning tables exactly. The GSM8K log predates
-the `gsm8k_rebuttal.py` → `run_gsm8k.py` rename and still prints a
-`REBUTTAL RESULT:` banner; it is otherwise the reported artifact, left
-unedited. GSM8K has no prediction JSONL — the evaluator records accuracy and an
-invalid count but never wrote per-example records.
+These reproduce the paper's reasoning tables exactly. Local paths in the logs
+are replaced with `<workdir>`.
 
 ## `bert/`
 

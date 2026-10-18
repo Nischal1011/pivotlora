@@ -22,6 +22,7 @@ from pivotlora import (  # noqa: E402
     eigenvalue_scaled_b_rates,
     orthogonality_error,
     output_preserving_pivot,
+    experiment_basis_scale,
     pca_initialization,
     preservation_error,
     reset_adam_state,
@@ -178,14 +179,15 @@ def test_pca_initialization_recovers_a_planted_subspace():
     assert np.allclose(singular_values, 1.0, atol=1e-3)
 
 
-def test_pca_basis_scale_matches_the_reasoning_protocol():
-    """GSM8K and SVAMP scale the orthonormal basis by sqrt(5)."""
+def test_pca_basis_scale_matches_the_experiments():
+    """Every reported experiment scales the orthonormal basis by sqrt(5 / d)."""
     activations = np.random.default_rng(1).standard_normal((128, D_IN))
-    scale = float(np.sqrt(5.0))
+    scale = experiment_basis_scale(D_IN)
+    assert np.isclose(scale, np.sqrt(5.0 / D_IN))
     A = pca_initialization(activations, rank=RANK, basis_scale=scale)
 
     gram = (A.to(torch.float64).T @ A.to(torch.float64)).numpy()
-    assert np.allclose(gram, 5.0 * np.eye(RANK), atol=1e-4)
+    assert np.allclose(gram, (5.0 / D_IN) * np.eye(RANK), atol=1e-6)
 
 
 def test_pca_initialization_rejects_rank_above_dimension():

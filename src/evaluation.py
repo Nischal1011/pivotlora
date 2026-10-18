@@ -1,12 +1,11 @@
 """
-Numeric-answer evaluation for the GSM8K and SVAMP reasoning experiments.
+Numeric-answer evaluation for the GSM8K reasoning experiment.
 
-This is the scorer used for both datasets. ``train_reasoning_gsm8k.py`` and
-``train_reasoning_svamp.py`` contain byte-identical copies of
-``NUMBER_PATTERN``, ``extract_answer``, and ``normalize_numeric_answer``; the
-SVAMP script deliberately reuses the frozen GSM8K protocol so that the paired
-comparison is not confounded by a change of scorer. This module is the single
-documented copy, exercised by ``tests/test_answer_parser.py``.
+``train_reasoning_gsm8k.py`` contains byte-identical copies of
+``NUMBER_PATTERN``, ``extract_answer``, and ``normalize_numeric_answer``. This
+module is the single documented copy, exercised by
+``tests/test_answer_parser.py``. StrategyQA uses a yes/no scorer defined in
+``train_reasoning_strategyqa.py``.
 
 Procedure (Appendix "Generation and Evaluation")
 ------------------------------------------------

@@ -1,0 +1,19 @@
+block,task,n,method,mean,std,num_seeds,source
+pissa,agnews,64,LoRA,0.634,0.055,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+pissa,agnews,64,PiSSA (reference PEFT),0.472,0.025,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+pissa,agnews,64,PiSSA (our implementation),0.477,0.027,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+pissa,cola,64,LoRA,0.183,0.104,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+pissa,cola,64,PiSSA (reference PEFT),0.087,0.116,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+pissa,cola,64,PiSSA (our implementation),0.099,0.108,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+pissa,sst2,64,LoRA,0.633,0.074,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+pissa,sst2,64,PiSSA (reference PEFT),0.548,0.051,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+pissa,sst2,64,PiSSA (our implementation),0.552,0.050,3,outputs/bert/baseline_fidelity/pissa_fidelity_raw.csv
+loram,agnews,64,LoRA,0.636,0.043,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv
+loram,agnews,64,LoRAM (our implementation),0.476,0.056,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv
+loram,agnews,64,LoRAM (intended magnitude),0.495,0.044,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv
+loram,cola,64,LoRA,0.201,0.089,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv
+loram,cola,64,LoRAM (our implementation),0.141,0.062,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv
+loram,cola,64,LoRAM (intended magnitude),0.106,0.065,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv
+loram,sst2,64,LoRA,0.639,0.063,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv
+loram,sst2,64,LoRAM (our implementation),0.597,0.018,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv
+loram,sst2,64,LoRAM (intended magnitude),0.580,0.039,3,outputs/bert/baseline_fidelity/loram_fidelity_raw.csv

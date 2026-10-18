@@ -1,0 +1,50 @@
+{
+  "protocol": "strategyqa_response_pca_qr_matched_v1",
+  "model": "meta-llama/Llama-3.1-8B",
+  "task": "StrategyQA completion-only SFT",
+  "source_protocol": "gsm8k_response_pca_qr_matched_v2",
+  "dataset": "ChilleD/StrategyQA",
+  "completion_format": "' ' + facts + '\\n#### ' + yes/no",
+  "scoring": "yes/no after final ####; else last standalone yes/no",
+  "screening_protocol": "paper/THIRD_DATASET_SCREENING.md",
+  "n_train": 128,
+  "full_eval_examples": 687,
+  "rank": 8,
+  "alpha": 16,
+  "targets": [
+    "q_proj",
+    "v_proj"
+  ],
+  "epochs": 15,
+  "pivot_epoch": 3,
+  "batch_size": 4,
+  "gradient_accumulation": 2,
+  "effective_batch_size": 8,
+  "base_learning_rate": 0.0002,
+  "weight_decay": 0.01,
+  "scheduler": "linear",
+  "warmup_steps": 0,
+  "pca_source": "mean-pooled hidden states at positions predicting supervised response tokens",
+  "pca_random_rotation": false,
+  "eigenvalue_learning_rates": false,
+  "differential_B_learning_rate": false,
+  "pivot": "FP64 output-preserving reduced QR",
+  "pivot_optimizer_reset": [
+    "A",
+    "B"
+  ],
+  "post_pivot_lr_override": false,
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "max_sequence_length": 512,
+  "max_new_tokens": 512,
+  "prompt_template": "Question: {question}\nAnswer:",
+  "completion": "' ' + answer field",
+  "prompt_is_token_prefix": true,
+  "format_compliance": "fraction of generations ending in '\\n#### yes' or '\\n#### no'",
+  "base_reference": "frozen pretrained model, no adapter or training, evaluated once",
+  "per_example_predictions": true
+}

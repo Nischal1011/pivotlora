@@ -16,7 +16,19 @@ The two methods use identical optimization. They differ only in:
 2. PivotLoRA applies one output-preserving QR reparameterization
    after epoch 3.
 
-Primary full study:
+Protocol v2:
+
+    The prompt ends at "Answer:" and the completion is " " + answer field.
+    v1 ended the prompt with "Answer: ", so at inference the model was
+    conditioned on a lone-space token that never preceded a completion in
+    training. The joined training text is identical in both versions;
+    format_train now asserts that the inference prompt is an exact token
+    prefix of each training sequence. Each run saves per-example
+    predictions and records the fraction of generations ending in
+    "#### <number>", and a frozen base-model reference ("base") is
+    evaluated once.
+
+Primary full study (base reference, then LoRA and PivotLoRA over three seeds):
     python -u run_gsm8k.py
 
 Only first paired seed:
@@ -95,20 +107,29 @@ MAX_SEQ_LEN = 512
 MAX_NEW_TOKENS = 512
 
 SEED_LIST = [42, 43, 44]
-METHODS = ["lora", "pivotlora"]
+
+# "base" evaluates the frozen pretrained model without adapters or training.
+# It is run once, on the first requested seed, as a reference point.
+METHODS = ["base", "lora", "pivotlora"]
 
 TARGET_MODULES = [
     "q_proj",
     "v_proj",
 ]
 
-# New filename: deliberately does not reuse old/hybrid results.
-RESULTS_CSV = "results_gsm8k_response_pivot_matched.csv"
-SMOKE_RESULTS_CSV = "results_gsm8k_response_pivot_matched_smoke.csv"
+# New filename: deliberately does not reuse v1 results.
+RESULTS_CSV = "results_gsm8k_response_pivot_matched_v2.csv"
+SMOKE_RESULTS_CSV = "results_gsm8k_response_pivot_matched_v2_smoke.csv"
 
-DIAGNOSTICS_DIR = "pivot_diagnostics_response_matched"
+DIAGNOSTICS_DIR = "pivot_diagnostics_response_matched_v2"
 
-PROTOCOL_ID = "gsm8k_response_pca_qr_matched_v1"
+PREDICTIONS_DIR = "predictions_gsm8k_response_matched_v2"
+SMOKE_PREDICTIONS_DIR = "predictions_gsm8k_response_matched_v2_smoke"
+
+# v2: the prompt ends at "Answer:" and the completion begins with a space,
+# so the inference prompt is an exact token prefix of every training
+# sequence. The joined training text is unchanged from v1.
+PROTOCOL_ID = "gsm8k_response_pca_qr_matched_v2"
 
 CSV_FIELDS = [
     "protocol",
@@ -118,12 +139,24 @@ CSV_FIELDS = [
     "eval_examples",
     "correct",
     "gsm8k_exact_match",
+    "parse_rate",
+    "format_compliance",
     "train_wall_time_seconds",
+    "predictions_file",
 ]
 
 PROMPT_TEMPLATE = (
     "Question: {question}\n"
-    "Answer: "
+    "Answer:"
+)
+
+# Prepended to the dataset answer field to form the completion.
+COMPLETION_PREFIX = " "
+
+# A generation complies with the trained format when it ends with a
+# numeric #### answer, as every GSM8K reference solution does.
+FORMAT_PATTERN = re.compile(
+    r"[\s\S]*\n####\s*-?\d[\d,]*(?:\.\d+)?\s*"
 )
 
 DEVICE = torch.device(
@@ -297,7 +330,11 @@ def format_train(example, tokenizer):
         question=question
     )
 
-    text_without_eos = prompt + answer
+    text_without_eos = (
+        prompt
+        + COMPLETION_PREFIX
+        + answer
+    )
     response_start_character = len(prompt)
 
     encoded = tokenizer(
@@ -350,6 +387,29 @@ def format_train(example, tokenizer):
         raise RuntimeError(
             "No answer tokens survived tokenization. "
             "The prompt may have consumed MAX_SEQ_LEN."
+        )
+
+    # The inference prompt must tokenize to exactly the unsupervised prefix
+    # of the training sequence. Otherwise generation starts from a token
+    # boundary never seen in training.
+    prompt_ids = tokenizer(
+        prompt,
+        add_special_tokens=True,
+    )["input_ids"]
+
+    first_supervised_index = next(
+        index
+        for index, label in enumerate(labels)
+        if label != -100
+    )
+
+    if (
+        input_ids[:len(prompt_ids)] != prompt_ids
+        or first_supervised_index != len(prompt_ids)
+    ):
+        raise RuntimeError(
+            "The inference prompt is not a token prefix of the "
+            "training sequence."
         )
 
     # Explicitly append and supervise EOS.
@@ -1537,6 +1597,7 @@ def evaluate_gsm8k(
     tokenizer,
     test_examples,
     test_answers,
+    predictions_path,
     max_eval=None,
 ):
     model.eval()
@@ -1563,6 +1624,8 @@ def evaluate_gsm8k(
 
     number_correct = 0
     invalid_predictions = 0
+    compliant_predictions = 0
+    prediction_records = []
 
     for example_index, (
         example,
@@ -1618,19 +1681,62 @@ def evaluate_gsm8k(
             skip_special_tokens=True,
         )
 
+        raw_prediction = extract_answer(
+            generated_text
+        )
+
         predicted_answer = (
             normalize_numeric_answer(
-                extract_answer(
-                    generated_text
-                )
+                raw_prediction
             )
         )
 
         if not predicted_answer:
             invalid_predictions += 1
 
-        if predicted_answer == ground_truth:
+        format_compliant = bool(
+            FORMAT_PATTERN.fullmatch(
+                generated_text
+            )
+        )
+
+        if format_compliant:
+            compliant_predictions += 1
+
+        correct = (
+            predicted_answer
+            == ground_truth
+        )
+
+        if correct:
             number_correct += 1
+
+        prediction_records.append(
+            {
+                "index": example_index,
+                "question": example["question"],
+                "reference_answer_normalized": (
+                    ground_truth
+                ),
+                "prompt": prompt,
+                "generated_completion": (
+                    generated_text
+                ),
+                "extracted_prediction": (
+                    raw_prediction
+                ),
+                "normalized_prediction": (
+                    predicted_answer
+                ),
+                "parsed": bool(
+                    predicted_answer
+                ),
+                "format_compliant": (
+                    format_compliant
+                ),
+                "correct": correct,
+            }
+        )
 
         processed = example_index + 1
 
@@ -1646,6 +1752,36 @@ def evaluate_gsm8k(
         number_correct / evaluation_count
     )
 
+    parse_rate = (
+        (evaluation_count - invalid_predictions)
+        / evaluation_count
+    )
+
+    format_compliance = (
+        compliant_predictions
+        / evaluation_count
+    )
+
+    os.makedirs(
+        os.path.dirname(predictions_path)
+        or ".",
+        exist_ok=True,
+    )
+
+    with open(
+        predictions_path,
+        "w",
+        encoding="utf-8",
+    ) as predictions_file:
+        for record in prediction_records:
+            predictions_file.write(
+                json.dumps(
+                    record,
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
     print(
         f"  [EVAL] GSM8K exact match: "
         f"{accuracy:.6f} "
@@ -1658,10 +1794,24 @@ def evaluate_gsm8k(
         f"{invalid_predictions}"
     )
 
+    print(
+        f"  [EVAL] Format-compliant predictions: "
+        f"{compliant_predictions}/"
+        f"{evaluation_count} "
+        f"({format_compliance:.6f})"
+    )
+
+    print(
+        f"  [EVAL] Predictions: "
+        f"{predictions_path}"
+    )
+
     return (
         accuracy,
         number_correct,
         evaluation_count,
+        parse_rate,
+        format_compliance,
     )
 
 
@@ -1715,6 +1865,60 @@ def run_experiment(
     )
 
     callbacks = []
+
+    predictions_path = os.path.join(
+        (
+            SMOKE_PREDICTIONS_DIR
+            if smoke
+            else PREDICTIONS_DIR
+        ),
+        (
+            f"{PROTOCOL_ID}_"
+            f"{method}_seed_{seed}"
+            f"{'_smoke' if smoke else ''}"
+            ".jsonl"
+        ),
+    )
+
+    maximum_evaluation_examples = (
+        SMOKE_EVAL_EXAMPLES
+        if smoke
+        else None
+    )
+
+    if method == "base":
+        (
+            accuracy,
+            number_correct,
+            evaluation_count,
+            parse_rate,
+            format_compliance,
+        ) = evaluate_gsm8k(
+            model=model,
+            tokenizer=tokenizer,
+            test_examples=test_examples,
+            test_answers=test_answers,
+            predictions_path=predictions_path,
+            max_eval=maximum_evaluation_examples,
+        )
+
+        del model
+        del train_dataset
+
+        gc.collect()
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        return {
+            "accuracy": accuracy,
+            "correct": number_correct,
+            "eval_examples": evaluation_count,
+            "parse_rate": parse_rate,
+            "format_compliance": format_compliance,
+            "train_wall_time": 0.0,
+            "predictions_file": predictions_path,
+        }
 
     if method == "lora":
         inject_lora(
@@ -1882,26 +2086,31 @@ def run_experiment(
                 "global step."
             )
 
-    maximum_evaluation_examples = (
-        SMOKE_EVAL_EXAMPLES
-        if smoke
-        else None
-    )
+    # Release the optimizer state and trainer before generation so the
+    # evaluation KV cache does not compete with them for GPU memory.
+    del trainer
+    del optimizer
+
+    gc.collect()
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     (
         accuracy,
         number_correct,
         evaluation_count,
+        parse_rate,
+        format_compliance,
     ) = evaluate_gsm8k(
         model=model,
         tokenizer=tokenizer,
         test_examples=test_examples,
         test_answers=test_answers,
+        predictions_path=predictions_path,
         max_eval=maximum_evaluation_examples,
     )
 
-    del trainer
-    del optimizer
     del model
     del train_dataset
 
@@ -1914,7 +2123,10 @@ def run_experiment(
         "accuracy": accuracy,
         "correct": number_correct,
         "eval_examples": evaluation_count,
+        "parse_rate": parse_rate,
+        "format_compliance": format_compliance,
         "train_wall_time": train_wall_time,
+        "predictions_file": predictions_path,
     }
 
 
@@ -1987,7 +2199,7 @@ def write_protocol_manifest(
     smoke=False,
 ):
     manifest_path = (
-        "gsm8k_response_pivot_matched_"
+        "gsm8k_response_pivot_matched_v2_"
         f"{'smoke_' if smoke else ''}"
         "manifest.json"
     )
@@ -2037,6 +2249,20 @@ def write_protocol_manifest(
         "seeds": SEED_LIST,
         "max_sequence_length": MAX_SEQ_LEN,
         "max_new_tokens": MAX_NEW_TOKENS,
+        "prompt_template": PROMPT_TEMPLATE,
+        "completion": (
+            f"{COMPLETION_PREFIX!r} + answer field"
+        ),
+        "prompt_is_token_prefix": True,
+        "format_compliance": (
+            "fraction of generations ending in "
+            "'\\n#### <number>'"
+        ),
+        "base_reference": (
+            "frozen pretrained model, no adapter "
+            "or training, evaluated once"
+        ),
+        "per_example_predictions": True,
     }
 
     with open(
@@ -2149,7 +2375,15 @@ def run_study(
 
     try:
         for method in methods:
-            for seed in seeds:
+            # Greedy evaluation of the frozen model does not depend on
+            # the training sample, so the base reference runs once.
+            method_seeds = (
+                seeds[:1]
+                if method == "base"
+                else seeds
+            )
+
+            for seed in method_seeds:
                 key = (
                     method,
                     seed,
@@ -2203,8 +2437,19 @@ def run_study(
                             "gsm8k_exact_match": (
                                 f"{result['accuracy']:.9f}"
                             ),
+                            "parse_rate": (
+                                f"{result['parse_rate']:.9f}"
+                            ),
+                            "format_compliance": (
+                                f"{result['format_compliance']:.9f}"
+                            ),
                             "train_wall_time_seconds": (
                                 f"{result['train_wall_time']:.2f}"
+                            ),
+                            "predictions_file": (
+                                result[
+                                    "predictions_file"
+                                ]
                             ),
                         }
                     )

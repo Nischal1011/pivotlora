@@ -1,0 +1,110 @@
+# Completion-only reasoning on StrategyQA: vanilla LoRA vs. response-position PivotLoRA.
+# Reproduces: results/reasoning.csv (strategyqa rows), results/pivot_diagnostics.csv
+# Paper: Section "Generated-Answer Mathematical Reasoning",
+#        Appendix "Generated-Answer Reasoning Details"
+# Entry point: python src/train_reasoning_strategyqa.py
+#
+# This protocol is frozen: LoRA and PivotLoRA share the sampled examples,
+# optimizer, schedule, tokenization, completion mask, training budget, decoding,
+# and scorer. PivotLoRA adds only the PCA initialization and the single pivot.
+
+experiment: strategyqa_response_pca_qr_matched_v1
+source_protocol: gsm8k_response_pca_qr_matched_v2
+script: src/train_reasoning_strategyqa.py
+
+model:
+  checkpoint: meta-llama/Llama-3.1-8B
+  base_precision: bf16
+  adapter_precision: float32
+  attention_implementation: sdpa
+
+adapter:
+  rank: 8
+  lora_alpha: 16
+  target_modules:                       # 32 layers x 2 = 64 adapters
+    - q_proj
+    - v_proj
+  adapted_modules: 64
+
+optimization:
+  optimizer: adamw
+  learning_rate: 2.0e-4                 # single rate for BOTH factors
+  weight_decay: 0.01
+  adam_betas: [0.9, 0.999]
+  adam_epsilon: 1.0e-8
+  scheduler: linear
+  warmup_steps: 0
+  epochs: 15
+  per_device_batch_size: 4
+  gradient_accumulation_steps: 2
+  effective_batch_size: 8
+  optimizer_steps: 240
+  max_sequence_length: 512
+
+# Unlike the classification protocol, reasoning uses NO differential and NO
+# eigenvalue-scaled learning rates, and no post-pivot warm-up.
+learning_rate_allocation:
+  scheme: uniform
+  differential_B_learning_rate: false
+  eigenvalue_learning_rates: false
+
+initialization:
+  activation_source: response_position
+  pooling: >-
+    mean over hidden states at positions t whose next token t+1 is supervised
+    (one pooled vector per training example, so response length does not weight
+    the covariance)
+  statistic: pca
+  pca_solver: randomized
+  pca_precision: float32
+  pca_random_rotation: false
+  basis_scale: sqrt(5/d)                # = 0.0349 for d = 4096; NOT norm-matched to Kaiming
+  init_B: zeros
+
+pivot:
+  enabled: true
+  epoch: 3                              # K
+  global_step: 48
+  decomposition: reduced QR in float64, stored back in float32
+  optimizer_state_reset: [A, B]         # BOTH factors, unlike classification
+  post_pivot_lr_override: false
+  preservation_tolerance: 1.0e-5        # a run aborts if exceeded
+
+data:
+  dataset: ChilleD/StrategyQA
+  train_pool: 1602                      # 1,603 minus the 1 question also in the test split
+  n_train: 128
+  eval_examples: 687                    # the complete test split
+  sampling: numpy.random.default_rng(seed).choice(1602, 128, replace=False)
+  manifests: manifests/strategyqa/
+  prompt_template: "Question: {question}\nAnswer:"
+  completion: "' ' + facts + '\n#### ' + yes/no"   # leading space: the prompt is an
+                                  # exact token prefix of the training sequence
+  completion_masking: >-
+    joint tokenization with character offsets; prompt tokens are set to -100;
+    completion tokens and the appended EOS are supervised
+
+generation:
+  decoding: greedy
+  batch_size: 1
+  max_new_tokens: 512
+  stop: EOS
+  pad_token: EOS
+
+evaluation:
+  metric: yes/no exact match
+  format_compliance: 'fraction of generations ending in "\n#### yes" or "\n#### no"'
+  base_reference: frozen Llama-3.1-8B without adapters, evaluated once
+  rule: >-
+    first standalone yes/no after the final '####'; otherwise the last
+    standalone yes/no in the response; unparsable outputs count as incorrect.
+  screening: >-
+    selected after a pre-specified base + LoRA screening (LoRA >= 55%, format
+    compliance >= 90%, truncation <= 10%), run before any PivotLoRA run
+
+seeds: [42, 43, 44]
+
+hardware:
+  gpu: NVIDIA GeForce RTX 5090 (31.8 GB)
+  torch: 2.9.0+cu128
+  cuda: "12.8"

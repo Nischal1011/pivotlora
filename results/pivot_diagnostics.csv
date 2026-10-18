@@ -2,9 +2,9 @@ experiment_family,task_or_dataset,seed,adapters_pivoted,pivot_epoch,pivot_step,m
 classification,agnews,aggregated_3_seeds,72,3,,3.14e-07,8.82e-07,2.94e-07,2.809,4.84e-07,2.77e-09,A only (B retained),paper_table_pivot-diagnostics
 classification,cola,aggregated_3_seeds,72,3,,3.00e-07,5.07e-07,2.87e-07,2.809,4.69e-07,-2.31e-09,A only (B retained),paper_table_pivot-diagnostics
 classification,sst2,aggregated_3_seeds,72,3,,2.79e-07,7.91e-07,2.89e-07,2.809,4.76e-07,2.56e-10,A only (B retained),paper_table_pivot-diagnostics
-reasoning,gsm8k,42,64,3,48,,1.2947022068694082e-07,,,2.3755287342740744e-08,,A and B,pivot_diagnostics_response_matched/gsm8k_response_pca_qr_matched_v1_seed_42.json
-reasoning,gsm8k,43,64,3,48,,1.2682279237621856e-07,,,1.6041505012410247e-08,,A and B,pivot_diagnostics_response_matched/gsm8k_response_pca_qr_matched_v1_seed_43.json
-reasoning,gsm8k,44,64,3,48,,1.326201872649239e-07,,,2.0266623032007824e-08,,A and B,pivot_diagnostics_response_matched/gsm8k_response_pca_qr_matched_v1_seed_44.json
-reasoning,svamp,42,64,3,48,,1.3284347556041658e-07,,,1.1545608400888366e-08,,A and B,pivot_diagnostics_svamp_response_matched/svamp_response_pca_qr_matched_v1_seed_42.json
-reasoning,svamp,43,64,3,48,,1.2908644342741866e-07,,,1.3728148963169992e-08,,A and B,pivot_diagnostics_svamp_response_matched/svamp_response_pca_qr_matched_v1_seed_43.json
-reasoning,svamp,44,64,3,48,,1.2528715345775008e-07,,,1.1254800662142749e-08,,A and B,pivot_diagnostics_svamp_response_matched/svamp_response_pca_qr_matched_v1_seed_44.json
+reasoning,gsm8k,42,64,3,48,,1.3627325829278589e-07,,2.6461286652118035,1.7403036854096284e-08,,A and B,outputs/reasoning/pivot_diagnostics/gsm8k_seed_42.json
+reasoning,gsm8k,43,64,3,48,,1.2626339508265758e-07,,2.6452036261983056,1.9954136234271977e-08,,A and B,outputs/reasoning/pivot_diagnostics/gsm8k_seed_43.json
+reasoning,gsm8k,44,64,3,48,,1.4446749369966124e-07,,2.6280658280983813,2.057826402314178e-08,,A and B,outputs/reasoning/pivot_diagnostics/gsm8k_seed_44.json
+reasoning,strategyqa,42,64,3,48,,1.3031625261758657e-07,,2.6792503512874073,2.893250366227387e-08,,A and B,outputs/reasoning/pivot_diagnostics/strategyqa_seed_42.json
+reasoning,strategyqa,43,64,3,48,,1.2604660151045106e-07,,2.6868141087601862,2.5041211419517357e-08,,A and B,outputs/reasoning/pivot_diagnostics/strategyqa_seed_43.json
+reasoning,strategyqa,44,64,3,48,,1.3396302326831073e-07,,2.6806289197345117,3.509150609380226e-08,,A and B,outputs/reasoning/pivot_diagnostics/strategyqa_seed_44.json

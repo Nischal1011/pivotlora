@@ -3,7 +3,7 @@
 # PROVENANCE, stated precisely:
 #
 #   * torch is pinned to the version actually recorded at run time for the
-#     GSM8K/SVAMP reasoning experiments (printed by report_hardware() and
+#     GSM8K/StrategyQA reasoning experiments (printed by report_hardware() and
 #     captured in both full-run logs): 2.9.0+cu128 with CUDA 12.8.
 #
 #   * No environment snapshot was captured for the BERT, GPT-2, or decoder

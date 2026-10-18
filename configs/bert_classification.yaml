@@ -39,7 +39,10 @@ learning_rate_allocation:
 initialization:
   activation_source: target_position    # the [CLS] representation
   statistic: pca                        # TT-LDA is the supervised ablation
-  basis_scale: 1.0
+  basis_scale: sqrt(5/d)                # d = adapter input dim (768 for BERT-base, 4096
+                                        # for Llama); applied in the LoRA layer, as in Eq. (7)
+  random_rotation: fixed random r x r orthogonal R per adapter (seeded by layer and
+                   projection); A = sqrt(5/d) R^T Q^T, so the row span is the PCA span
   init_B: zeros                         # so Delta_W = 0 at initialization
 
 pivot:

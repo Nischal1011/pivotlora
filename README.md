@@ -35,10 +35,10 @@ tasks (Pearson r = 0.93, exact permutation p = 0.002 over seven tasks).
 **Headline results.** Across 30 BERT-base few-shot settings and 13 methods,
 PivotLoRA has the best average rank and beats vanilla LoRA in 29 of 30
 settings. Decoder-scale classification reproduces the low-shot pattern on
-LLaMA-2-7B and Llama-3.1-8B. A response-position extension gives positive mean
-paired gains on GSM8K (+1.49 pp) and SVAMP (+31.89 pp), while full-data
-classification and mean-pooled summarization show little or no directional
-advantage.
+Llama-2-7B and Llama-3.1-8B. With Llama-3.1-8B, a response-position extension
+gives mean paired gains of +4.55 pp on GSM8K (3/3 seeds) and +3.59 pp on
+StrategyQA, while full-data classification and
+mean-pooled summarization show little or no directional advantage.
 
 ---
 
@@ -56,8 +56,19 @@ reasoning experiments (PyTorch 2.9.0+cu128, CUDA 12.8); see
 
 [`results/`](results/) holds the summaries matching the paper's tables, with a
 `source` column on every row. [`outputs/`](outputs/) holds the run artifacts
-behind them: per-seed CSVs, protocol manifests, pivot diagnostics, the SVAMP
-predictions, and the reasoning run logs. Checkpoints are not included.
+behind them: per-seed CSVs, protocol manifests, pivot diagnostics, every
+reasoning prediction, and the reasoning run logs. Checkpoints are not included.
+
+> **Reasoning results were rerun for the final version.** The originally
+> released reasoning scripts ended the prompt with `"Answer: "`. With the
+> Llama-3.1 tokenizer, that trailing space becomes a lone token at inference
+> but merges into the first completion token during training, so generation
+> started from a token boundary never seen in training and often broke the
+> trained answer format. The scripts now end the prompt at `"Answer:"` and
+> begin the completion with a space; the joined training text is unchanged,
+> and the code asserts that the inference prompt is a token prefix of every
+> training sequence. The superseded outputs are kept in
+> [`outputs/reasoning/superseded_v1/`](outputs/reasoning/superseded_v1/).
 
 ---
 
@@ -84,7 +95,7 @@ CPU-only is enough to run everything under `tests/` and `analysis/` — plain
 |---|---|---|
 | `torch` | 2.9.0+cu128 | recorded at run time for the reasoning experiments |
 | `transformers` | 5.14.1 | models, `Trainer`, the pivot callbacks |
-| `datasets` | 5.0.1 | GLUE, AG News, GSM8K, SVAMP, XSum, CNN/DailyMail |
+| `datasets` | 5.0.1 | GLUE, AG News, BoolQ, GSM8K, StrategyQA, XSum, CNN/DailyMail |
 | `peft` | 0.20.0 | AdaLoRA and DoRA baselines only; PivotLoRA is implemented directly |
 | `numpy` / `scipy` / `scikit-learn` | 2.4.6 / 1.17.1 / 1.9.0 | PCA, QR, metrics |
 | `rouge-score`, `nltk`, `evaluate` | — | summarization controls only |
@@ -143,12 +154,13 @@ Config: [`configs/bert_classification.yaml`](configs/bert_classification.yaml) �
 Results: [`results/bert_main.csv`](results/bert_main.csv),
 [`results/bert_aggregate.csv`](results/bert_aggregate.csv)
 
-### Reasoning adaptation (GSM8K and SVAMP)
+### Reasoning adaptation (GSM8K, StrategyQA)
 
 ```bash
-# Full paired study: both methods, all three seeds, complete test split.
+# Full paired study: base-model reference once, then LoRA and PivotLoRA over
+# all three seeds, on the complete test split.
 python src/train_reasoning_gsm8k.py
-python src/train_reasoning_svamp.py
+python src/train_reasoning_strategyqa.py
 
 # First K seeds only (--seeds 1 runs seed 42; --seeds 2 runs 42 and 43).
 python src/train_reasoning_gsm8k.py --seeds 1
@@ -156,18 +168,23 @@ python src/train_reasoning_gsm8k.py --seeds 1
 # One method only.
 python src/train_reasoning_gsm8k.py --methods pivotlora
 
-# Smoke test: both methods, seed 42, 4 epochs, 50-example eval.
+# Smoke test: base, LoRA, PivotLoRA, seed 42, 4 epochs, 50-example eval.
 # Still reaches the epoch-3 pivot, so it exercises the full code path.
 python src/train_reasoning_gsm8k.py --smoke
 ```
 
+`src/train_reasoning_math.py` (MATH-500) is included for completeness. It was
+considered as an additional dataset but stopped at the pipeline-check stage,
+because every method scored near the floor in this setting; it produced no
+reported results.
+
 Configs: [`configs/gsm8k.yaml`](configs/gsm8k.yaml),
-[`configs/svamp.yaml`](configs/svamp.yaml) ·
+[`configs/strategyqa.yaml`](configs/strategyqa.yaml) ·
 Results: [`results/reasoning.csv`](results/reasoning.csv),
 [`results/pivot_diagnostics.csv`](results/pivot_diagnostics.csv) ·
 Run outputs: [`outputs/reasoning/`](outputs/reasoning/) ·
 Manifests: [`manifests/gsm8k/`](manifests/gsm8k/),
-[`manifests/svamp/`](manifests/svamp/)
+[`manifests/strategyqa/`](manifests/strategyqa/)
 
 ### Computing the alignment coefficient ρ
 
@@ -252,13 +269,14 @@ python src/validate_spiked_covariance.py            # synthetic theory validatio
 
 | Paper result | Config | Summary | Run output |
 |---|---|---|---|
-| Table 1 — BERT-base main (SST-2, AG News) | `configs/bert_classification.yaml` | `results/bert_main.csv` | [`outputs/bert/main_bert_results.csv`](outputs/bert/main_bert_results.csv) |
+| Table 1 — BERT-base six-task summary (mean per N, rank, wins vs. LoRA) | `configs/bert_classification.yaml` | `results/bert_main.csv` | [`outputs/bert/main_bert_results.csv`](outputs/bert/main_bert_results.csv) |
 | Appendix — complete BERT results, 7 tasks × 13 methods × 5 N | `configs/bert_classification.yaml` | `results/bert_main.csv` | [`outputs/bert/main_bert_results.csv`](outputs/bert/main_bert_results.csv) |
 | Appendix — full aggregate rankings (avg. rank 1.83, 29/30 vs. LoRA) | — | `results/bert_aggregate.csv` | — |
 | Table 2 — decoder-scale at N=64 | `configs/decoder_classification.yaml` | `results/decoder_classification.csv` | [`outputs/decoder/`](outputs/decoder/) |
 | Appendix — LLaMA-2-7B / Llama-3.1-8B / BoolQ tables | `configs/decoder_classification.yaml` | `results/decoder_classification.csv` | [`outputs/decoder/`](outputs/decoder/) |
-| §4.4 + Appendix — GSM8K and SVAMP per-seed | `configs/gsm8k.yaml`, `configs/svamp.yaml` | `results/reasoning.csv` | [`outputs/reasoning/`](outputs/reasoning/) |
-| Appendix — reasoning pivot diagnostics (1.33e-7 / 2.38e-8) | `configs/gsm8k.yaml`, `configs/svamp.yaml` | `results/pivot_diagnostics.csv` | [`outputs/reasoning/pivot_diagnostics/`](outputs/reasoning/pivot_diagnostics/) |
+| §5.4 + Appendix — GSM8K and StrategyQA per-seed | `configs/gsm8k.yaml`, `configs/strategyqa.yaml` | `results/reasoning.csv` | [`outputs/reasoning/`](outputs/reasoning/) |
+| Appendix — reasoning pivot diagnostics (1.44e-7 / 3.51e-8) | `configs/gsm8k.yaml`, `configs/strategyqa.yaml` | `results/pivot_diagnostics.csv` | [`outputs/reasoning/pivot_diagnostics/`](outputs/reasoning/pivot_diagnostics/) |
+| Appendix — baseline fidelity (PiSSA, LoRAM) | — | `results/baseline_fidelity.csv` | [`outputs/bert/baseline_fidelity/`](outputs/bert/baseline_fidelity/) |
 | Appendix — classification pivot diagnostics | `configs/bert_classification.yaml` | `results/pivot_diagnostics.csv` | — |
 | Appendix — learning-rate sensitivity (PivotLoRA .667) | `configs/lr_sweep.yaml` | `results/tuned_comparison.csv` | [`outputs/bert/lr_sweep_agnews.csv`](outputs/bert/lr_sweep_agnews.csv) |
 | Figure 3 + Appendix — alignment ρ vs. gain | — | `results/alignment.csv` | [`outputs/bert/alignment/`](outputs/bert/alignment/) |
@@ -270,7 +288,7 @@ python src/validate_spiked_covariance.py            # synthetic theory validatio
 
 `results/` holds the tidied summaries matching the paper's tables;
 [`outputs/`](outputs/) holds what the runs actually produced — per-seed CSVs,
-protocol manifests, per-adapter pivot diagnostics, every SVAMP prediction, and
+protocol manifests, per-adapter pivot diagnostics, every reasoning prediction, and
 the full reasoning run logs. See [`results/README.md`](results/README.md) and
 [`outputs/README.md`](outputs/README.md) for per-file schemas.
 
@@ -292,7 +310,7 @@ PivotLoRA/
 │   ├── train_classification.py           BERT-base benchmark (all 13 methods)
 │   ├── train_decoder_classification.py   LLaMA-2-7B / Llama-3.1-8B classification
 │   ├── train_reasoning_gsm8k.py          GSM8K, LoRA vs. response-position PivotLoRA
-│   ├── train_reasoning_svamp.py          SVAMP, same frozen protocol
+│   ├── train_reasoning_strategyqa.py     StrategyQA, same protocol
 │   │
 │   ├── compute_rho.py                    alignment coefficient ρ
 │   ├── alignment_rho.py                  ρ uncertainty and class-imbalance analysis
@@ -311,11 +329,11 @@ PivotLoRA/
 ├── manifests/                            exact sampled-example indices
 │   ├── bert/                             90 files: 6 tasks × 5 N × 3 seeds
 │   ├── gsm8k/                            3 files: seeds 42, 43, 44
-│   └── svamp/                            3 files: indices *and* stable SVAMP IDs
+│   └── strategyqa/                       3 files: indices and question IDs
 ├── results/                              result summaries + schema notes
 ├── outputs/                              run artifacts behind those summaries
 │   ├── reasoning/                        per-seed CSVs, manifests, pivot
-│   │                                     diagnostics, SVAMP predictions, logs
+│   │                                     diagnostics, predictions, logs
 │   ├── bert/                             benchmark, ablations, alignment
 │   ├── decoder/                          Llama-3.1-8B classification
 │   └── summarization/                    GPT-2 ROUGE-L controls
@@ -354,10 +372,11 @@ principal run.
 - **GSM8K** (`manifests/gsm8k/gsm8k_seed_<seed>.json`) — positional indices from
   `default_rng(seed).choice(7473, 128, replace=False)`. GSM8K rows carry no
   stable ID field, so indices are the only available handle.
-- **SVAMP** (`manifests/svamp/svamp_seed_<seed>.json`) — both positional indices
-  **and** the stable `chal-*` IDs. The ID sets were regenerated from the
-  sampling code and cross-checked against the `selected_train_IDs` lines in the
-  original run logs; all three seeds match exactly.
+- **StrategyQA** (`manifests/strategyqa/strategyqa_seed_<seed>.json`) —
+  positional indices into the 1,602-question training pool and the dataset's
+  `qid`s, from `default_rng(seed).choice(1602, 128, replace=False)`. They were
+  reconstructed from the sampling code; the run script does not log sampled
+  IDs, so they are marked as not run-verified.
 
 Manifests were reconstructed from the sampling code. Dataset text is not
 redistributed — the indices and IDs rebuild each subset from the public
@@ -373,7 +392,7 @@ datasets.
 | GPT-2 summarization controls | 1 × NVIDIA T4, 16 GB | FP16 |
 | LLaMA-2-7B classification | 1 × NVIDIA L4, 24 GB | BF16 (~14.6 GB peak) |
 | Llama-3.1-8B classification | 1 × NVIDIA L4, 24 GB | BF16 |
-| Llama-3.1-8B GSM8K / SVAMP reasoning | 1 × NVIDIA GeForce RTX 5090, 31.8 GB, CUDA 12.8, PyTorch 2.9.0+cu128 | BF16 base, FP32 adapters |
+| Llama-3.1-8B GSM8K / StrategyQA reasoning | 1 × NVIDIA GeForce RTX 5090, 31.8 GB, CUDA 12.8, PyTorch 2.9.0+cu128 | BF16 base, FP32 adapters |
 
 Overhead is small: on the BERT measurement PivotLoRA adds 4.0 s (+5.8%) to a
 ~69 s run and 2 MB of peak VRAM, mostly from the per-rank optimizer groups
@@ -384,7 +403,7 @@ second.
 
 ## Key hyperparameters at a glance
 
-| | BERT classification | Decoder classification | GSM8K / SVAMP reasoning |
+| | BERT classification | Decoder classification | GSM8K / StrategyQA reasoning |
 |---|---|---|---|
 | Rank `r` | 8 | 8 | 8 |
 | LoRA `α` | 16 | 16 | 16 |
@@ -397,26 +416,30 @@ second.
 | Optimizer reset | `A` only, `B` retained | `A` only | **both `A` and `B`** |
 | Differential / eigen-scaled LR | yes, `λ_ratio = 16` | yes | **no** |
 | Post-pivot `B` warm-up | 10 steps | 10 steps | **none** |
-| Basis scale | 1.0 | 1.0 | **√5 ≈ 2.2361** |
+| Initial `A` | `√(5/d)·Rᵀ Qᵀ`, fixed random rotation `R` | `√(5/d)·Rᵀ Qᵀ` | **`√(5/d)·Qᵀ`, no rotation** |
 | Seeds | 42, 43, 44 | 42, 43, 44 | 42, 43, 44 |
 
 The reasoning column differs deliberately on the bolded rows: those
 experiments vary initialization, basis scale, and pivot-state handling jointly,
 so they evaluate the complete response-position procedure rather than subspace
-direction alone. The `√5` basis scale is not norm-matched to Kaiming-uniform
-initialization.
+direction alone. In every setting the PCA basis is scaled by `√(5/d)`, which
+gives `A` a Frobenius norm of `√(5r/d)`: about 7× smaller than Kaiming-uniform
+at `d = 768` and 16× smaller at `d = 4096`. It is therefore not norm-matched to
+vanilla LoRA. In classification, a fixed random `r × r` rotation `R` mixes
+coordinates within the PCA span without changing it.
 
 ---
 
 ## Scope of the results
 
 - ρ is defined from discrete class means; it does not apply to open-ended
-  generation and is not used to predict the GSM8K or SVAMP gains.
+  generation and is not used to predict the reasoning gains.
 - Aggregate rankings hold under the shared benchmark protocol, not under
   per-baseline tuning. `results/tuned_comparison.csv` is the sensitivity
   analysis.
-- The reasoning results use three paired seeds per dataset. GSM8K has one
-  negative seed and the SVAMP gain ranges from +19.33 to +50.67 pp.
+- The reasoning results use three paired seeds per dataset. GSM8K is positive
+  at every seed (+3.03 to +7.20 pp); StrategyQA has seed gains of +5.39, 0.00,
+  and +5.39 pp.
 - The activation-source ablation and the direction-versus-rate controls ran in
   separate environments, so compare within each experiment rather than across
   them.

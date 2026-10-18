@@ -1,47 +1,32 @@
-#!/usr/bin/env python3
 """
-run_svamp.py
+run_math.py
 
-Controlled additional-dataset replication:
+Controlled reasoning experiment on MATH-500:
 
     Vanilla LoRA
         versus
     Response-position PivotLoRA
 
-This script preserves the frozen GSM8K protocol for:
+Identical to the GSM8K v2 protocol (run_gsm8k.py) except for:
 
-    - Joint prompt/completion tokenization
-    - Character-offset completion-only masking
-    - Response-predictor-position activation pooling
-    - Randomized rank-8 PCA with no random rotation
-    - Custom LoRA parameterization
-    - FP64 output-preserving QR pivot after epoch 3
-    - AdamW-state reset for both transformed factors
-    - Optimizer, scheduler, and training hyperparameters
-    - Greedy generation and numeric answer extraction
+    - Training pool: EleutherAI/hendrycks_math, all 7 subjects, train split,
+      restricted to examples whose prompt + solution + EOS fits in
+      MAX_SEQ_LEN tokens and whose solution contains a \\boxed{} answer
+    - Test set: HuggingFaceH4/MATH-500 (500 problems)
+    - Completion: " " + the original worked solution
+    - Scoring: exact match of the last \\boxed{} answer after the reference
+      Hendrycks MATH normalization; the scorer is self-tested on the
+      reference solutions at startup
+    - Format compliance: fraction of generations containing \\boxed{}
+    - Truncation: fraction of generations that hit MAX_NEW_TOKENS
 
-Only dataset-specific components are changed:
+Pre-registration: paper/MATH500_PREREGISTRATION.md
 
-    - Dataset: ChilleD/SVAMP
-    - Official 700-example train split
-    - Official 300-example test split
-    - 128 sampled training examples per seed
-    - Prompt constructed from Body and Question
-    - Completion constructed from Equation and Answer
-    - Evaluation against the numeric Answer field
-    - Per-example JSONL prediction files
+Full study (base reference, then LoRA and PivotLoRA over three seeds):
+    python -u run_math.py
 
-Full study:
-    python -u run_svamp.py
-
-Only first paired seed:
-    python -u run_svamp.py --seeds 1
-
-Only PivotLoRA:
-    python -u run_svamp.py --methods pivotlora --seeds 3
-
-Smoke test:
-    python -u run_svamp.py --smoke
+Pipeline check (seed 42, 4 epochs, 50 test problems):
+    python -u run_math.py --smoke
 """
 
 # =============================================================================
@@ -53,7 +38,6 @@ import os
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["WANDB_DISABLED"] = "true"
-
 
 # =============================================================================
 # Imports
@@ -87,21 +71,16 @@ from transformers import (
 
 warnings.filterwarnings("ignore")
 
-
 # =============================================================================
 # Fixed protocol
 # =============================================================================
 
 MODEL_NAME = "meta-llama/Llama-3.1-8B"
-DATASET_NAME = "ChilleD/SVAMP"
 
 RANK = 8
 ALPHA = 16
 
 N_TRAIN = 128
-EXPECTED_TRAIN_EXAMPLES = 700
-EXPECTED_TEST_EXAMPLES = 300
-
 EPOCHS = 15
 PIVOT_EPOCH = 3
 
@@ -116,49 +95,71 @@ MAX_SEQ_LEN = 512
 MAX_NEW_TOKENS = 512
 
 SEED_LIST = [42, 43, 44]
-METHODS = ["lora", "pivotlora"]
+
+# "base" evaluates the frozen pretrained model without adapters or training.
+# It is run once, on the first requested seed, as a reference point.
+METHODS = ["base", "lora", "pivotlora"]
 
 TARGET_MODULES = [
     "q_proj",
     "v_proj",
 ]
 
-RESULTS_CSV = "results_svamp_response_pivot_matched.csv"
-SMOKE_RESULTS_CSV = "results_svamp_response_pivot_matched_smoke.csv"
+# New filename: deliberately does not reuse v1 results.
+RESULTS_CSV = "results_math500_response_pivot_matched_v2.csv"
+SMOKE_RESULTS_CSV = "results_math500_response_pivot_matched_v2_smoke.csv"
 
-DIAGNOSTICS_DIR = "pivot_diagnostics_svamp_response_matched"
-SMOKE_DIAGNOSTICS_DIR = "pivot_diagnostics_svamp_response_matched_smoke"
+DIAGNOSTICS_DIR = "pivot_diagnostics_math500_response_matched_v2"
 
-PREDICTIONS_DIR = "predictions_svamp_response_matched"
-SMOKE_PREDICTIONS_DIR = "predictions_svamp_response_matched_smoke"
+PREDICTIONS_DIR = "predictions_math500_response_matched_v2"
+SMOKE_PREDICTIONS_DIR = "predictions_math500_response_matched_v2_smoke"
 
-PROTOCOL_ID = "svamp_response_pca_qr_matched_v1"
+# v2 adds an explicit instruction to box the final answer (pipeline checks
+# 1-2 under v1 had 68-70% format compliance). Otherwise follows the GSM8K v2
+# prompt convention: the prompt ends at "Answer:" and
+# the completion begins with a space, so the inference prompt is an exact
+# token prefix of every training sequence.
+PROTOCOL_ID = "math500_response_pca_qr_matched_v2"
+
+TRAIN_DATASET = "EleutherAI/hendrycks_math"
+TRAIN_SUBJECTS = [
+    "algebra",
+    "counting_and_probability",
+    "geometry",
+    "intermediate_algebra",
+    "number_theory",
+    "prealgebra",
+    "precalculus",
+]
+TEST_DATASET = "HuggingFaceH4/MATH-500"
+EXPECTED_TEST_EXAMPLES = 500
+
+# Minimum fraction of reference solutions the scorer must grade correct.
+SCORER_SELF_TEST_THRESHOLD = 0.98
 
 CSV_FIELDS = [
     "protocol",
-    "dataset",
-    "model",
     "method",
     "seed",
     "n_train",
     "eval_examples",
     "correct",
-    "svamp_numeric_accuracy",
+    "math_exact_match",
+    "truncation_rate",
     "parse_rate",
+    "format_compliance",
     "train_wall_time_seconds",
     "predictions_file",
-    "diagnostics_file",
 ]
 
 PROMPT_TEMPLATE = (
-    "Question: {problem}\n"
-    "Answer: "
+    "Question: {question}\n"
+    "Put the final answer in \\boxed{{}}.\n"
+    "Answer:"
 )
 
-COMPLETION_TEMPLATE = (
-    "Equation: {equation}\n"
-    "#### {answer}"
-)
+# Prepended to the worked solution to form the completion.
+COMPLETION_PREFIX = " "
 
 DEVICE = torch.device(
     "cuda" if torch.cuda.is_available() else "cpu"
@@ -167,17 +168,19 @@ DEVICE = torch.device(
 # Pivot validation tolerance for the actual FP32-stored factors.
 PRESERVATION_TOLERANCE = 1e-5
 
-# Preserve the PCA initialization scale from the frozen GSM8K protocol.
+# PCA initialization scale used by the prior implementation.
+# Q has unit-norm columns, so this gives each PCA direction the
+# submitted initialization scale before training.
 PCA_INITIALIZATION_SCALE_MULTIPLIER = math.sqrt(5.0)
 
-# Smoke mode must reach the epoch-3 pivot.
+# Smoke mode must reach the pivot.
 SMOKE_EPOCHS = 4
 SMOKE_EVAL_EXAMPLES = 50
-
 
 # =============================================================================
 # Reproducibility and hardware reporting
 # =============================================================================
+
 
 def configure_reproducibility(seed):
     set_seed(seed)
@@ -245,105 +248,177 @@ def report_hardware():
 
 
 # =============================================================================
-# SVAMP formatting
-# =============================================================================
-
-def clean_text(value):
-    return " ".join(
-        str(value).strip().split()
-    )
-
-
-def build_problem(example):
-    body = clean_text(example["Body"])
-    question = clean_text(example["Question"])
-
-    if body and question:
-        return f"{body} {question}"
-
-    return body or question
-
-
-def build_prompt(example):
-    return PROMPT_TEMPLATE.format(
-        problem=build_problem(example)
-    )
-
-
-def build_completion(example):
-    return COMPLETION_TEMPLATE.format(
-        equation=clean_text(
-            example["Equation"]
-        ),
-        answer=clean_text(
-            example["Answer"]
-        ),
-    )
-
-
-# =============================================================================
 # Answer extraction and normalization
 # =============================================================================
 
-# This is intentionally the same basic numeric extraction policy as the
-# frozen GSM8K implementation.
-NUMBER_PATTERN = re.compile(
-    r"-?\d+(?:,\d+)*(?:\.\d+)?"
-)
+
+# Answer extraction and equivalence for MATH, following the reference
+# implementation released with Hendrycks et al. (2021).
 
 
-def extract_answer(text):
-    """
-    Extract the numeric answer after the final #### marker.
+def last_boxed_only_string(string):
+    index = string.rfind("\\boxed")
 
-    If the marker is absent, use the final generated number. This mirrors
-    the frozen GSM8K evaluation behavior.
-    """
+    if index < 0:
+        index = string.rfind("\\fbox")
 
-    if "####" in text:
-        answer_portion = (
-            text.split("####")[-1].strip()
-        )
+        if index < 0:
+            return None
 
-        numbers = NUMBER_PATTERN.findall(
-            answer_portion
-        )
+    open_braces = 0
+    right_brace_index = None
 
-        if numbers:
-            return numbers[0].replace(",", "")
+    for position in range(index, len(string)):
+        if string[position] == "{":
+            open_braces += 1
 
-    numbers = NUMBER_PATTERN.findall(text)
+        if string[position] == "}":
+            open_braces -= 1
 
-    if numbers:
-        return numbers[-1].replace(",", "")
+            if open_braces == 0:
+                right_brace_index = position
+                break
 
-    return ""
+    if right_brace_index is None:
+        return None
+
+    return string[index:right_brace_index + 1]
 
 
-def normalize_numeric_answer(answer):
-    answer = str(answer).strip().replace(
-        ",",
-        "",
-    )
+def remove_boxed(string):
+    if string.startswith("\\boxed "):
+        return string[len("\\boxed "):]
 
-    if not answer:
+    for left in ("\\boxed{", "\\fbox{"):
+        if string.startswith(left) and string.endswith("}"):
+            return string[len(left):-1]
+
+    return None
+
+
+def extract_boxed_answer(text):
+    boxed = last_boxed_only_string(text)
+
+    if boxed is None:
         return ""
 
+    answer = remove_boxed(boxed)
+
+    return answer if answer is not None else ""
+
+
+def _fix_fracs(string):
+    substrings = string.split("\\frac")
+    new_string = substrings[0]
+
+    for substring in substrings[1:]:
+        new_string += "\\frac"
+
+        if len(substring) > 0 and substring[0] == "{":
+            new_string += substring
+            continue
+
+        if len(substring) < 2:
+            return string
+
+        a = substring[0]
+        b = substring[1]
+
+        if b != "{":
+            new_string += "{" + a + "}{" + b + "}" + substring[2:]
+        else:
+            new_string += "{" + a + "}" + b + substring[2:]
+
+    return new_string
+
+
+def _fix_a_slash_b(string):
+    if len(string.split("/")) != 2:
+        return string
+
+    a, b = string.split("/")
+
     try:
-        numeric_value = float(answer)
+        a = int(a)
+        b = int(b)
 
-        if not math.isfinite(numeric_value):
-            return answer
+        if string != f"{a}/{b}":
+            return string
 
-        if numeric_value.is_integer():
-            return str(int(numeric_value))
-
-        return format(
-            numeric_value,
-            ".15g",
-        )
+        return "\\frac{" + str(a) + "}{" + str(b) + "}"
 
     except ValueError:
+        return string
+
+
+def _remove_right_units(string):
+    if "\\text{ " in string:
+        splits = string.split("\\text{ ")
+
+        if len(splits) == 2:
+            return splits[0]
+
+    return string
+
+
+def _fix_sqrt(string):
+    if "\\sqrt" not in string:
+        return string
+
+    splits = string.split("\\sqrt")
+    new_string = splits[0]
+
+    for split in splits[1:]:
+        if len(split) > 0 and split[0] != "{":
+            new_string += "\\sqrt{" + split[0] + "}" + split[1:]
+        else:
+            new_string += "\\sqrt" + split
+
+    return new_string
+
+
+def strip_string(string):
+    string = string.replace("\n", "")
+    string = string.replace("\\!", "")
+    string = string.replace("\\\\", "\\")
+    string = string.replace("tfrac", "frac")
+    string = string.replace("dfrac", "frac")
+    string = string.replace("\\left", "")
+    string = string.replace("\\right", "")
+    string = string.replace("^{\\circ}", "")
+    string = string.replace("^\\circ", "")
+    string = string.replace("\\$", "")
+    string = _remove_right_units(string)
+    string = string.replace("\\%", "")
+    string = string.replace("%", "")
+    string = string.replace(" .", " 0.")
+    string = string.replace("{.", "{0.")
+
+    if len(string) == 0:
+        return string
+
+    if string[0] == ".":
+        string = "0" + string
+
+    if len(string.split("=")) == 2 and len(string.split("=")[0]) <= 2:
+        string = string.split("=")[1]
+
+    string = _fix_sqrt(string)
+    string = string.replace(" ", "")
+    string = _fix_fracs(string)
+
+    if string == "0.5":
+        string = "\\frac{1}{2}"
+
+    string = _fix_a_slash_b(string)
+
+    return string
+
+
+def normalize_math_answer(answer):
+    try:
+        return strip_string(answer)
+    except Exception:
         return answer
 
 
@@ -351,29 +426,33 @@ def normalize_numeric_answer(answer):
 # Completion-only tokenization
 # =============================================================================
 
+
 def format_train(example, tokenizer):
     """
     Build a completion-only causal-LM example using character offsets.
 
-    Prompt and completion are tokenized together. This avoids assuming that
-    independently tokenizing the prompt and prompt-plus-completion produces
-    an identical token prefix.
+    This avoids assuming that independently tokenizing the prompt and
+    the prompt-plus-answer produces an identical token prefix.
 
     Labels:
         prompt and special-prefix tokens: -100
-        completion tokens: token ID
+        answer tokens: token ID
         appended EOS: token ID
         padding: -100
-
-    A token is supervised when it contains at least one completion character.
-    Therefore, a tokenizer token crossing the prompt/completion character
-    boundary is correctly treated as supervised.
     """
 
-    prompt = build_prompt(example)
-    completion = build_completion(example)
+    question = example["question"]
+    answer = example["answer"]
 
-    text_without_eos = prompt + completion
+    prompt = PROMPT_TEMPLATE.format(
+        question=question
+    )
+
+    text_without_eos = (
+        prompt
+        + COMPLETION_PREFIX
+        + answer
+    )
     response_start_character = len(prompt)
 
     encoded = tokenizer(
@@ -385,28 +464,18 @@ def format_train(example, tokenizer):
         return_offsets_mapping=True,
     )
 
-    input_ids = list(
-        encoded["input_ids"]
-    )
+    input_ids = list(encoded["input_ids"])
     attention_mask = list(
         encoded["attention_mask"]
     )
-    offsets = list(
-        encoded["offset_mapping"]
-    )
+    offsets = list(encoded["offset_mapping"])
 
     labels = []
-    supervised_response_tokens = 0
-    first_supervised_index = None
+    supervised_answer_tokens = 0
 
-    for token_index, (
-        token_id,
-        offset,
-    ) in enumerate(
-        zip(
-            input_ids,
-            offsets,
-        )
+    for token_id, offset in zip(
+        input_ids,
+        offsets,
     ):
         start_character = int(offset[0])
         end_character = int(offset[1])
@@ -417,8 +486,9 @@ def format_train(example, tokenizer):
             and end_character == 0
         )
 
-        # Preserve the frozen GSM8K masking policy: supervise every token
-        # containing at least one response character.
+        # Supervise every token containing at least one answer
+        # character. This also correctly handles a token that crosses
+        # the prompt/answer character boundary.
         is_response_token = (
             not is_special_offset
             and end_character
@@ -427,74 +497,43 @@ def format_train(example, tokenizer):
 
         if is_response_token:
             labels.append(token_id)
-            supervised_response_tokens += 1
-
-            if first_supervised_index is None:
-                first_supervised_index = (
-                    token_index
-                )
+            supervised_answer_tokens += 1
         else:
             labels.append(-100)
 
-    if supervised_response_tokens == 0:
+    if supervised_answer_tokens == 0:
         raise RuntimeError(
-            "No completion tokens survived tokenization. "
+            "No answer tokens survived tokenization. "
             "The prompt may have consumed MAX_SEQ_LEN."
         )
 
-    if first_supervised_index is None:
+    # The inference prompt must tokenize to exactly the unsupervised prefix
+    # of the training sequence. Otherwise generation starts from a token
+    # boundary never seen in training.
+    prompt_ids = tokenizer(
+        prompt,
+        add_special_tokens=True,
+    )["input_ids"]
+
+    first_supervised_index = next(
+        index
+        for index, label in enumerate(labels)
+        if label != -100
+    )
+
+    if (
+        input_ids[:len(prompt_ids)] != prompt_ids
+        or first_supervised_index != len(prompt_ids)
+    ):
         raise RuntimeError(
-            "Completion-only boundary verification failed."
+            "The inference prompt is not a token prefix of the "
+            "training sequence."
         )
-
-    first_offset = offsets[
-        first_supervised_index
-    ]
-
-    if int(first_offset[1]) <= response_start_character:
-        raise RuntimeError(
-            "The first supervised token does not contain "
-            "a completion character."
-        )
-
-    # Every preceding non-special token must end at or before the response
-    # boundary under the frozen character-offset masking policy.
-    for index in range(first_supervised_index):
-        start_character = int(
-            offsets[index][0]
-        )
-        end_character = int(
-            offsets[index][1]
-        )
-
-        is_special_offset = (
-            start_character == 0
-            and end_character == 0
-        )
-
-        if (
-            not is_special_offset
-            and end_character
-            > response_start_character
-        ):
-            raise RuntimeError(
-                "A response token was masked before the "
-                "recorded completion boundary."
-            )
-
-        if labels[index] != -100:
-            raise RuntimeError(
-                "A prompt token was unexpectedly supervised."
-            )
 
     # Explicitly append and supervise EOS.
-    input_ids.append(
-        tokenizer.eos_token_id
-    )
+    input_ids.append(tokenizer.eos_token_id)
     attention_mask.append(1)
-    labels.append(
-        tokenizer.eos_token_id
-    )
+    labels.append(tokenizer.eos_token_id)
 
     if len(input_ids) > MAX_SEQ_LEN:
         raise RuntimeError(
@@ -545,7 +584,7 @@ def format_train(example, tokenizer):
     }
 
 
-class SVAMPDataset(Dataset):
+class MATHDataset(Dataset):
     def __init__(
         self,
         examples,
@@ -567,85 +606,14 @@ class SVAMPDataset(Dataset):
 
 
 # =============================================================================
-# Data validation, loading, and paired sampling
+# Data loading and paired sampling
 # =============================================================================
-
-def validate_svamp_split(
-    examples,
-    split_name,
-):
-    required_fields = {
-        "ID",
-        "Body",
-        "Question",
-        "Equation",
-        "Answer",
-    }
-
-    seen_ids = set()
-
-    for index, example in enumerate(
-        examples
-    ):
-        missing_fields = (
-            required_fields
-            - set(example.keys())
-        )
-
-        if missing_fields:
-            raise RuntimeError(
-                f"SVAMP {split_name} row {index} "
-                f"is missing fields: "
-                f"{sorted(missing_fields)}"
-            )
-
-        example_id = str(
-            example["ID"]
-        )
-
-        if example_id in seen_ids:
-            raise RuntimeError(
-                f"Duplicate SVAMP ID {example_id!r} "
-                f"in {split_name}."
-            )
-
-        seen_ids.add(example_id)
-
-        if not clean_text(example["Question"]):
-            raise RuntimeError(
-                f"SVAMP {split_name} row {index} "
-                "has an empty Question."
-            )
-
-        if not clean_text(example["Equation"]):
-            raise RuntimeError(
-                f"SVAMP {split_name} row {index} "
-                "has an empty Equation."
-            )
-
-        normalized_answer = (
-            normalize_numeric_answer(
-                example["Answer"]
-            )
-        )
-
-        if not normalized_answer:
-            raise RuntimeError(
-                f"SVAMP {split_name} row {index} "
-                "has an unparseable Answer."
-            )
-
-    return seen_ids
 
 
 def sample_training_examples(
     training_examples,
     seed,
 ):
-    """
-    Preserve the frozen GSM8K sampling implementation.
-    """
-
     rng = np.random.default_rng(seed)
 
     selected_indices = rng.choice(
@@ -660,81 +628,118 @@ def sample_training_examples(
     ]
 
 
-def load_svamp_splits():
-    dataset = load_dataset(
-        DATASET_NAME
-    )
+def load_math_splits(tokenizer):
+    pool = []
 
-    if (
-        "train" not in dataset
-        or "test" not in dataset
-    ):
-        raise RuntimeError(
-            f"{DATASET_NAME} must expose official "
-            "train and test splits."
+    for subject in TRAIN_SUBJECTS:
+        subject_split = load_dataset(
+            TRAIN_DATASET,
+            subject,
+            split="train",
         )
 
-    training_examples = list(
-        dataset["train"]
+        pool.extend(subject_split)
+
+    eligible = []
+    too_long = 0
+    unboxed = 0
+
+    for example in pool:
+        if not extract_boxed_answer(example["solution"]):
+            unboxed += 1
+            continue
+
+        prompt = PROMPT_TEMPLATE.format(
+            question=example["problem"]
+        )
+
+        length = len(
+            tokenizer(
+                prompt
+                + COMPLETION_PREFIX
+                + example["solution"],
+                add_special_tokens=True,
+            )["input_ids"]
+        ) + 1
+
+        if length > MAX_SEQ_LEN:
+            too_long += 1
+            continue
+
+        eligible.append(
+            {
+                "question": example["problem"],
+                "answer": example["solution"],
+            }
+        )
+
+    print(
+        f"[DATA] train_total={len(pool)} "
+        f"| eligible={len(eligible)} "
+        f"| excluded_too_long={too_long} "
+        f"| excluded_unboxed={unboxed}"
     )
 
-    test_examples = list(
-        dataset["test"]
+    test_split = load_dataset(
+        TEST_DATASET,
+        split="test",
+    )
+
+    if len(test_split) != EXPECTED_TEST_EXAMPLES:
+        raise RuntimeError(
+            f"Expected {EXPECTED_TEST_EXAMPLES} MATH-500 "
+            f"problems; received {len(test_split)}."
+        )
+
+    test_examples = [
+        {
+            "question": example["problem"],
+            "unique_id": example["unique_id"],
+            "subject": example["subject"],
+            "level": example["level"],
+        }
+        for example in test_split
+    ]
+
+    test_answers = [
+        normalize_math_answer(example["answer"])
+        for example in test_split
+    ]
+
+    # The scorer must grade the reference solutions as correct.
+    self_test_matches = sum(
+        normalize_math_answer(
+            extract_boxed_answer(example["solution"])
+        )
+        == reference
+        for example, reference in zip(
+            test_split,
+            test_answers,
+        )
+    )
+
+    self_test_rate = (
+        self_test_matches / len(test_split)
     )
 
     print(
-        f"[DATA] train_pool="
-        f"{len(training_examples)} "
+        f"[SCORER] reference self-test: "
+        f"{self_test_matches}/{len(test_split)} "
+        f"({self_test_rate:.4f})"
+    )
+
+    if self_test_rate < SCORER_SELF_TEST_THRESHOLD:
+        raise RuntimeError(
+            "Scorer self-test below threshold."
+        )
+
+    print(
+        f"[DATA] train_pool={len(eligible)} "
         f"| test={len(test_examples)}"
     )
 
-    if (
-        len(training_examples)
-        != EXPECTED_TRAIN_EXAMPLES
-    ):
-        raise RuntimeError(
-            "Unexpected official SVAMP training size: "
-            f"expected {EXPECTED_TRAIN_EXAMPLES}, "
-            f"received {len(training_examples)}."
-        )
-
-    if (
-        len(test_examples)
-        != EXPECTED_TEST_EXAMPLES
-    ):
-        raise RuntimeError(
-            "Unexpected official SVAMP test size: "
-            f"expected {EXPECTED_TEST_EXAMPLES}, "
-            f"received {len(test_examples)}."
-        )
-
-    train_ids = validate_svamp_split(
-        examples=training_examples,
-        split_name="train",
-    )
-
-    test_ids = validate_svamp_split(
-        examples=test_examples,
-        split_name="test",
-    )
-
-    overlap = train_ids & test_ids
-
-    if overlap:
-        raise RuntimeError(
-            "Official SVAMP train and test splits "
-            f"overlap on {len(overlap)} IDs."
-        )
-
-    test_answers = [
-        normalize_numeric_answer(
-            example["Answer"]
-        )
-        for example in test_examples
-    ]
-
     return (
-        training_examples,
+        eligible,
         test_examples,
         test_answers,
     )
@@ -743,6 +748,7 @@ def load_svamp_splits():
 # =============================================================================
 # LoRA layer
 # =============================================================================
+
 
 class LoRALayer(nn.Module):
     """
@@ -753,7 +759,7 @@ class LoRALayer(nn.Module):
 
         adapter(x) = (alpha / rank) * x @ A @ B
 
-    This is the transpose of the common paper convention:
+    This is the transpose of the paper convention:
 
         A_paper: [rank, d_in]
         B_paper: [d_out, rank]
@@ -780,13 +786,13 @@ class LoRALayer(nn.Module):
             original_layer.out_features
         )
 
-        device = (
-            original_layer.weight.device
-        )
+        device = original_layer.weight.device
         adapter_dtype = torch.float32
 
         if init_A is None:
-            # Preserve the standard frozen-protocol LoRA initialization.
+            # Standard LoRA initialization:
+            # create [rank, d_in], initialize with Kaiming-uniform,
+            # then transpose into stored [d_in, rank] coordinates.
             standard_A = torch.empty(
                 rank,
                 input_dimension,
@@ -800,8 +806,7 @@ class LoRALayer(nn.Module):
             )
 
             initialized_A = (
-                standard_A
-                .transpose(0, 1)
+                standard_A.transpose(0, 1)
                 .contiguous()
             )
 
@@ -833,7 +838,8 @@ class LoRALayer(nn.Module):
             initialized_A
         )
 
-        # Zero-B initialization preserves the pretrained output.
+        # Standard zero-B initialization preserves the pretrained
+        # model output exactly at initialization.
         self.lora_B = nn.Parameter(
             torch.zeros(
                 rank,
@@ -843,14 +849,10 @@ class LoRALayer(nn.Module):
             )
         )
 
-        original_layer.weight.requires_grad = (
-            False
-        )
+        original_layer.weight.requires_grad = False
 
         if original_layer.bias is not None:
-            original_layer.bias.requires_grad = (
-                False
-            )
+            original_layer.bias.requires_grad = False
 
     def forward(self, x):
         base_output = self.original_layer(x)
@@ -879,24 +881,18 @@ class LoRALayer(nn.Module):
 # Model utilities
 # =============================================================================
 
+
 def get_llama_layers(model):
     return model.model.layers
 
 
 def get_model_input_device(model):
     return next(
-        get_llama_layers(model)[0]
-        .parameters()
+        get_llama_layers(model)[0].parameters()
     ).device
 
 
 def load_base_model():
-    if not torch.cuda.is_available():
-        raise RuntimeError(
-            "A CUDA GPU is required for "
-            "meta-llama/Llama-3.1-8B."
-        )
-
     model = (
         AutoModelForCausalLM
         .from_pretrained(
@@ -916,6 +912,7 @@ def load_base_model():
 # Response-predictor-position PCA
 # =============================================================================
 
+
 def compute_pca_basis(
     activations,
     rank,
@@ -924,8 +921,8 @@ def compute_pca_basis(
     """
     activations: [number_of_examples, hidden_dimension]
 
-    PCA mean-centers over examples internally. Only the ordered PCA basis
-    is returned. No random rotation is applied.
+    PCA mean-centers over examples internally. Only the ordered PCA
+    basis is returned. No random rotation is applied.
     """
 
     number_of_samples, dimension = (
@@ -940,8 +937,8 @@ def compute_pca_basis(
 
     if number_of_components < rank:
         raise RuntimeError(
-            f"Need at least rank+1 pooled examples "
-            f"for rank-{rank} PCA; received "
+            f"Need at least rank+1 pooled examples for "
+            f"rank-{rank} PCA; received "
             f"{number_of_samples}."
         )
 
@@ -949,10 +946,7 @@ def compute_pca_basis(
         n_components=rank,
         svd_solver="randomized",
         random_state=random_state,
-        n_oversamples=max(
-            10,
-            2 * rank,
-        ),
+        n_oversamples=max(10, 2 * rank),
         iterated_power=4,
     )
 
@@ -962,7 +956,8 @@ def compute_pca_basis(
     # stored LoRA A:      [dimension, rank]
     basis = pca.components_.T.copy()
 
-    # Preserve column order while removing numerical non-orthogonality.
+    # Re-orthogonalize for numerical cleanliness while retaining
+    # column order. QR may flip signs, which does not change the span.
     basis, _ = np.linalg.qr(
         basis,
         mode="reduced",
@@ -983,21 +978,26 @@ def get_response_position_subspaces(
     seed,
 ):
     """
-    Collect one pooled response-predictor activation per example and layer.
+    Collect one pooled response-predictor activation per example and
+    layer.
 
-    For causal-LM training, hidden state t predicts token t+1. Therefore,
-    hidden state position t is selected when label t+1 is supervised.
+    For causal LM training, hidden state t predicts token t+1.
+    Therefore, hidden state position t is selected when label t+1 is
+    supervised.
+
+    Activations are immediately mean-pooled within each example.
+    Full token-level activation collections are never retained.
     """
 
     print(
-        "[SUBSPACE] Computing "
-        "response-position PCA..."
+        "[SUBSPACE] Computing response-position PCA..."
     )
 
     model.eval()
     model.config.use_cache = False
 
     layers = get_llama_layers(model)
+
     pooled_by_layer = defaultdict(list)
 
     active_predictor_mask = {
@@ -1019,9 +1019,7 @@ def get_response_position_subspaces(
                     "the model forward pass."
                 )
 
-            sequence_length = (
-                hidden_states.shape[1]
-            )
+            sequence_length = hidden_states.shape[1]
 
             predictor_mask_local = (
                 predictor_mask[
@@ -1035,19 +1033,15 @@ def get_response_position_subspaces(
             )
 
             valid_examples = (
-                predictor_mask_local.any(
-                    dim=1
-                )
+                predictor_mask_local.any(dim=1)
             )
 
             if not valid_examples.any():
                 return
 
-            selected_states = (
-                hidden_states[
-                    valid_examples
-                ]
-            )
+            selected_states = hidden_states[
+                valid_examples
+            ]
 
             selected_mask = (
                 predictor_mask_local[
@@ -1076,6 +1070,7 @@ def get_response_position_subspaces(
                 / denominator
             )
 
+            # Only one vector per valid example is stored.
             pooled_by_layer[
                 layer_index
             ].append(
@@ -1086,24 +1081,21 @@ def get_response_position_subspaces(
 
     handles = []
 
-    # q_proj and v_proj receive the same adapter input.
+    # q_proj and v_proj receive the same adapter input, so one hook
+    # per transformer layer is sufficient.
     for layer_index, layer in enumerate(
         layers
     ):
         handle = (
             layer.self_attn.q_proj
             .register_forward_pre_hook(
-                make_pre_hook(
-                    layer_index
-                )
+                make_pre_hook(layer_index)
             )
         )
 
         handles.append(handle)
 
-    device = get_model_input_device(
-        model
-    )
+    device = get_model_input_device(model)
 
     loader = DataLoader(
         train_dataset,
@@ -1117,111 +1109,90 @@ def get_response_position_subspaces(
         with torch.no_grad():
             for batch in loader:
                 labels = batch["labels"]
-
                 attention_mask = (
                     batch["attention_mask"]
                     .bool()
                 )
 
-                predictor_mask = (
-                    torch.zeros_like(
-                        labels,
-                        dtype=torch.bool,
-                    )
+                predictor_mask = torch.zeros_like(
+                    labels,
+                    dtype=torch.bool,
                 )
 
-                # Hidden state t predicts supervised label t+1.
+                # Correct causal response-position shift:
+                # hidden state t predicts supervised label t+1.
                 predictor_mask[:, :-1] = (
                     labels[:, 1:] != -100
                 )
 
                 # Exclude padded predictor positions.
-                predictor_mask &= (
-                    attention_mask
-                )
+                predictor_mask &= attention_mask
 
                 if not predictor_mask.any():
                     raise RuntimeError(
-                        "A PCA extraction batch contained "
-                        "no supervised predictor positions."
+                        "A PCA extraction batch contained no "
+                        "supervised predictor positions."
                     )
 
-                active_predictor_mask[
-                    "value"
-                ] = predictor_mask.to(
-                    device
+                active_predictor_mask["value"] = (
+                    predictor_mask.to(device)
                 )
 
                 model(
                     input_ids=(
-                        batch["input_ids"]
-                        .to(device)
+                        batch["input_ids"].to(device)
                     ),
                     attention_mask=(
-                        batch["attention_mask"]
-                        .to(device)
+                        batch["attention_mask"].to(device)
                     ),
                     use_cache=False,
                 )
 
     finally:
-        active_predictor_mask["value"] = (
-            None
-        )
+        active_predictor_mask["value"] = None
 
         for handle in handles:
             handle.remove()
 
     subspaces = defaultdict(dict)
 
-    if len(pooled_by_layer) != len(
-        layers
-    ):
+    if len(pooled_by_layer) != len(layers):
         raise RuntimeError(
-            "Activation extraction did not "
-            "cover every layer: got "
-            f"{len(pooled_by_layer)} of "
+            "Activation extraction did not cover every "
+            f"layer: got {len(pooled_by_layer)} of "
             f"{len(layers)}."
         )
 
-    for layer_index in range(
-        len(layers)
-    ):
-        pooled_batches = (
-            pooled_by_layer[layer_index]
-        )
+    for layer_index in range(len(layers)):
+        pooled_batches = pooled_by_layer[
+            layer_index
+        ]
 
         if not pooled_batches:
             raise RuntimeError(
-                f"No pooled activations for "
-                f"layer {layer_index}."
+                f"No pooled activations for layer "
+                f"{layer_index}."
             )
 
-        activation_matrix = (
-            torch.cat(
-                pooled_batches,
-                dim=0,
-            )
-            .numpy()
-        )
+        activation_matrix = torch.cat(
+            pooled_batches,
+            dim=0,
+        ).numpy()
 
-        if (
-            activation_matrix.shape[0]
-            != len(train_dataset)
+        if activation_matrix.shape[0] != len(
+            train_dataset
         ):
             raise RuntimeError(
                 f"Layer {layer_index} produced "
-                f"{activation_matrix.shape[0]} "
-                f"pooled examples; expected "
-                f"{len(train_dataset)}."
+                f"{activation_matrix.shape[0]} pooled "
+                f"examples; expected {len(train_dataset)}."
             )
 
         layer_basis = compute_pca_basis(
             activations=activation_matrix,
             rank=rank,
             random_state=(
-                seed * 1000
-                + layer_index
+                seed * 1000 + layer_index
             ),
         )
 
@@ -1235,12 +1206,10 @@ def get_response_position_subspaces(
 
         if layer_index % 8 == 0:
             print(
-                f"  [SUBSPACE] "
-                f"layer={layer_index:>2} "
+                f"  [SUBSPACE] layer={layer_index:>2} "
                 f"| examples="
                 f"{activation_matrix.shape[0]} "
-                f"| d="
-                f"{activation_matrix.shape[1]}"
+                f"| d={activation_matrix.shape[1]}"
             )
 
     del pooled_by_layer
@@ -1257,6 +1226,7 @@ def get_response_position_subspaces(
 # =============================================================================
 # LoRA injection
 # =============================================================================
+
 
 def inject_lora(
     model,
@@ -1322,13 +1292,6 @@ def inject_lora(
             f"expected {expected_adapters}."
         )
 
-    if adapter_count != 64:
-        raise RuntimeError(
-            f"Expected 64 q_proj/v_proj adapters "
-            f"for Llama-3.1-8B; received "
-            f"{adapter_count}."
-        )
-
     print(
         f"[INJECT] adapters={adapter_count} "
         f"| trainable={trainable_parameters:,}"
@@ -1341,12 +1304,13 @@ def inject_lora(
 # Matched optimizer
 # =============================================================================
 
+
 def build_matched_optimizer(model):
     """
     Both methods use this exact optimizer.
 
     There are no method-specific parameter groups, eigenvalue rates,
-    differential rates, or post-pivot learning-rate overrides.
+    differential rates, or post-pivot LR overrides.
     """
 
     trainable_parameters = [
@@ -1373,6 +1337,7 @@ def build_matched_optimizer(model):
 # Output-preserving QR pivot
 # =============================================================================
 
+
 class PivotCallback(TrainerCallback):
     """
     Stored coordinates:
@@ -1395,9 +1360,9 @@ class PivotCallback(TrainerCallback):
         = Q R B_old
         = A_old B_old
 
-    The transformation is computed in FP64 and stored in FP32.
+    The transformation is computed in FP64 and then stored in FP32.
     AdamW state is reset for both transformed factors. The ordinary
-    Trainer linear learning-rate scheduler continues unchanged.
+    Trainer linear LR scheduler continues unchanged.
     """
 
     def __init__(
@@ -1406,12 +1371,9 @@ class PivotCallback(TrainerCallback):
         diagnostics_path,
     ):
         self.pivot_epoch = pivot_epoch
-        self.diagnostics_path = (
-            diagnostics_path
-        )
+        self.diagnostics_path = diagnostics_path
         self.pivot_done = False
         self.pivot_global_step = None
-        self.summary = None
 
     @staticmethod
     def _frobenius_product_norm_squared(
@@ -1419,22 +1381,17 @@ class PivotCallback(TrainerCallback):
         B,
     ):
         """
-        Compute ||AB||_F^2 using rank-by-rank Gram matrices.
+        Compute ||A B||_F^2 using only rank-by-rank Gram matrices.
 
         A: [d, r]
         B: [r, m]
         """
 
-        gram_A = (
-            A.transpose(0, 1) @ A
-        )
-        gram_B = (
-            B @ B.transpose(0, 1)
-        )
+        gram_A = A.transpose(0, 1) @ A
+        gram_B = B @ B.transpose(0, 1)
 
         value = (
-            gram_A
-            * gram_B.transpose(0, 1)
+            gram_A * gram_B.transpose(0, 1)
         ).sum()
 
         return value.clamp_min(0.0)
@@ -1502,15 +1459,12 @@ class PivotCallback(TrainerCallback):
             - 2.0 * cross
         ).clamp_min(0.0)
 
-        denominator = (
-            old_squared.clamp_min(
-                1e-30
-            )
+        denominator = old_squared.clamp_min(
+            1e-30
         )
 
         return torch.sqrt(
-            difference_squared
-            / denominator
+            difference_squared / denominator
         ).item()
 
     @staticmethod
@@ -1534,10 +1488,12 @@ class PivotCallback(TrainerCallback):
     ):
         if optimizer is None:
             raise RuntimeError(
-                "Pivot callback did not "
-                "receive the optimizer."
+                "Pivot callback did not receive "
+                "the optimizer."
             )
 
+        # Removing the complete state entry makes AdamW initialize
+        # fresh moments and a fresh step counter on the next update.
         optimizer.state.pop(
             parameter,
             None,
@@ -1561,28 +1517,22 @@ class PivotCallback(TrainerCallback):
         if state.epoch is None:
             return control
 
-        if (
-            state.epoch + 1e-8
-            < self.pivot_epoch
-        ):
+        if state.epoch + 1e-8 < self.pivot_epoch:
             return control
 
         if model is None:
             raise RuntimeError(
-                "Pivot callback did not "
-                "receive model."
+                "Pivot callback did not receive model."
             )
 
         if optimizer is None:
             raise RuntimeError(
-                "Pivot callback did not "
-                "receive optimizer."
+                "Pivot callback did not receive optimizer."
             )
 
         print(
-            f"[PivotLoRA] Executing "
-            f"output-preserving QR pivot "
-            f"at epoch={state.epoch:.6f}, "
+            f"[PivotLoRA] Executing output-preserving "
+            f"QR pivot at epoch={state.epoch:.6f}, "
             f"global_step={state.global_step}"
         )
 
@@ -1600,15 +1550,13 @@ class PivotCallback(TrainerCallback):
 
             with torch.no_grad():
                 A_old_64 = (
-                    module.lora_A
-                    .detach()
+                    module.lora_A.detach()
                     .to(dtype=torch.float64)
                     .clone()
                 )
 
                 B_old_64 = (
-                    module.lora_B
-                    .detach()
+                    module.lora_B.detach()
                     .to(dtype=torch.float64)
                     .clone()
                 )
@@ -1620,51 +1568,32 @@ class PivotCallback(TrainerCallback):
                 )
 
                 # A_old = Q R.
-                Q_64, R_64 = (
-                    torch.linalg.qr(
-                        A_old_64,
-                        mode="reduced",
-                    )
+                Q_64, R_64 = torch.linalg.qr(
+                    A_old_64,
+                    mode="reduced",
                 )
 
                 A_new_64 = Q_64
-                B_new_64 = (
-                    R_64 @ B_old_64
+                B_new_64 = R_64 @ B_old_64
+
+                # Store in the actual FP32 adapter parameter dtype.
+                A_new_stored = A_new_64.to(
+                    device=module.lora_A.device,
+                    dtype=module.lora_A.dtype,
                 )
 
-                A_new_stored = (
-                    A_new_64.to(
-                        device=(
-                            module.lora_A.device
-                        ),
-                        dtype=(
-                            module.lora_A.dtype
-                        ),
-                    )
+                B_new_stored = B_new_64.to(
+                    device=module.lora_B.device,
+                    dtype=module.lora_B.dtype,
                 )
 
-                B_new_stored = (
-                    B_new_64.to(
-                        device=(
-                            module.lora_B.device
-                        ),
-                        dtype=(
-                            module.lora_B.dtype
-                        ),
-                    )
+                # Validate the actual stored factors after conversion.
+                A_check_64 = A_new_stored.to(
+                    dtype=torch.float64
                 )
 
-                # Validate actual stored factors.
-                A_check_64 = (
-                    A_new_stored.to(
-                        dtype=torch.float64
-                    )
-                )
-
-                B_check_64 = (
-                    B_new_stored.to(
-                        dtype=torch.float64
-                    )
+                B_check_64 = B_new_stored.to(
+                    dtype=torch.float64
                 )
 
                 preservation_error = (
@@ -1686,9 +1615,8 @@ class PivotCallback(TrainerCallback):
                     preservation_error
                 ):
                     raise RuntimeError(
-                        "Non-finite pivot "
-                        "preservation error in "
-                        f"{module_name}."
+                        "Non-finite pivot preservation "
+                        f"error in {module_name}."
                     )
 
                 if not math.isfinite(
@@ -1696,7 +1624,7 @@ class PivotCallback(TrainerCallback):
                 ):
                     raise RuntimeError(
                         "Non-finite post-pivot "
-                        "orthogonality error in "
+                        f"orthogonality error in "
                         f"{module_name}."
                     )
 
@@ -1705,9 +1633,8 @@ class PivotCallback(TrainerCallback):
                     > PRESERVATION_TOLERANCE
                 ):
                     raise RuntimeError(
-                        "Pivot preservation error "
-                        "exceeded tolerance in "
-                        f"{module_name}: "
+                        "Pivot preservation error exceeded "
+                        f"tolerance in {module_name}: "
                         f"{preservation_error:.3e} > "
                         f"{PRESERVATION_TOLERANCE:.3e}"
                     )
@@ -1720,7 +1647,7 @@ class PivotCallback(TrainerCallback):
                     B_new_stored
                 )
 
-                # Preserve the frozen GSM8K optimizer-state policy.
+                # Both parameter tensors changed coordinates.
                 self._reset_optimizer_state(
                     optimizer,
                     module.lora_A,
@@ -1762,14 +1689,7 @@ class PivotCallback(TrainerCallback):
 
         if not diagnostics:
             raise RuntimeError(
-                "Pivot callback found no "
-                "LoRA modules."
-            )
-
-        if pivoted_modules != 64:
-            raise RuntimeError(
-                f"Expected 64 pivoted adapters, "
-                f"received {pivoted_modules}."
+                "Pivot callback found no LoRA modules."
             )
 
         maximum_preservation_error = max(
@@ -1789,7 +1709,6 @@ class PivotCallback(TrainerCallback):
 
         diagnostics_summary = {
             "protocol": PROTOCOL_ID,
-            "dataset": DATASET_NAME,
             "pivot_epoch_requested": (
                 self.pivot_epoch
             ),
@@ -1807,9 +1726,6 @@ class PivotCallback(TrainerCallback):
                 "lora_B",
             ],
             "learning_rate_override": False,
-            "preservation_tolerance": (
-                PRESERVATION_TOLERANCE
-            ),
             "maximum_preservation_error": (
                 maximum_preservation_error
             ),
@@ -1818,14 +1734,6 @@ class PivotCallback(TrainerCallback):
             ),
             "maximum_orthogonality_after": (
                 maximum_orthogonality_after
-            ),
-            "all_updates_preserved": (
-                maximum_preservation_error
-                <= PRESERVATION_TOLERANCE
-            ),
-            "all_bases_orthonormal": (
-                maximum_orthogonality_after
-                <= PRESERVATION_TOLERANCE
             ),
             "modules": diagnostics,
         }
@@ -1853,7 +1761,6 @@ class PivotCallback(TrainerCallback):
         self.pivot_global_step = int(
             state.global_step
         )
-        self.summary = diagnostics_summary
 
         print(
             f"[PivotLoRA] Pivoted "
@@ -1861,21 +1768,19 @@ class PivotCallback(TrainerCallback):
         )
 
         print(
-            "[PivotLoRA] Maximum "
-            "preservation error="
-            f"{maximum_preservation_error:.3e}"
+            "[PivotLoRA] Maximum preservation "
+            f"error={maximum_preservation_error:.3e}"
         )
 
         print(
             "[PivotLoRA] Maximum post-pivot "
-            "orthogonality error="
+            f"orthogonality error="
             f"{maximum_orthogonality_after:.3e}"
         )
 
         print(
-            "[PivotLoRA] Optimizer state reset "
-            "for A and B; Trainer LR schedule "
-            "unchanged"
+            "[PivotLoRA] Optimizer state reset for "
+            "A and B; Trainer LR schedule unchanged"
         )
 
         return control
@@ -1885,7 +1790,8 @@ class PivotCallback(TrainerCallback):
 # Evaluation
 # =============================================================================
 
-def evaluate_svamp(
+
+def evaluate_math(
     model,
     tokenizer,
     test_examples,
@@ -1902,38 +1808,23 @@ def evaluate_svamp(
 
     model.config.use_cache = True
 
-    device = get_model_input_device(
-        model
-    )
+    device = get_model_input_device(model)
 
     if max_eval is not None:
-        test_examples = (
-            test_examples[:max_eval]
-        )
-        test_answers = (
-            test_answers[:max_eval]
-        )
+        test_examples = test_examples[:max_eval]
+        test_answers = test_answers[:max_eval]
 
-    evaluation_count = len(
-        test_examples
-    )
+    evaluation_count = len(test_examples)
 
     if evaluation_count == 0:
         raise RuntimeError(
             "Evaluation set is empty."
         )
 
-    if (
-        len(test_answers)
-        != evaluation_count
-    ):
-        raise RuntimeError(
-            "Test examples and answer counts "
-            "do not match."
-        )
-
     number_correct = 0
-    valid_predictions = 0
+    invalid_predictions = 0
+    compliant_predictions = 0
+    truncated_predictions = 0
     prediction_records = []
 
     for example_index, (
@@ -1945,8 +1836,8 @@ def evaluate_svamp(
             test_answers,
         )
     ):
-        prompt = build_prompt(
-            example
+        prompt = PROMPT_TEMPLATE.format(
+            question=example["question"]
         )
 
         encoded_prompt = tokenizer(
@@ -1961,9 +1852,7 @@ def evaluate_svamp(
         )
 
         attention_mask = (
-            encoded_prompt[
-                "attention_mask"
-            ]
+            encoded_prompt["attention_mask"]
             .to(device)
         )
 
@@ -1971,9 +1860,7 @@ def evaluate_svamp(
             output_ids = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                max_new_tokens=(
-                    MAX_NEW_TOKENS
-                ),
+                max_new_tokens=MAX_NEW_TOKENS,
                 do_sample=False,
                 pad_token_id=(
                     tokenizer.eos_token_id
@@ -1989,29 +1876,42 @@ def evaluate_svamp(
             input_ids.shape[1]:,
         ]
 
-        generated_text = (
-            tokenizer.decode(
-                generated_ids,
-                skip_special_tokens=True,
-            )
+        generated_text = tokenizer.decode(
+            generated_ids,
+            skip_special_tokens=True,
         )
 
-        raw_prediction = extract_answer(
+        raw_prediction = extract_boxed_answer(
             generated_text
         )
 
         predicted_answer = (
-            normalize_numeric_answer(
+            normalize_math_answer(
                 raw_prediction
             )
         )
 
-        parsed = bool(
-            predicted_answer
+        if not predicted_answer:
+            invalid_predictions += 1
+
+        format_compliant = (
+            last_boxed_only_string(
+                generated_text
+            )
+            is not None
         )
 
-        if parsed:
-            valid_predictions += 1
+        truncated = (
+            len(generated_ids) >= MAX_NEW_TOKENS
+            and int(generated_ids[-1])
+            != tokenizer.eos_token_id
+        )
+
+        if truncated:
+            truncated_predictions += 1
+
+        if format_compliant:
+            compliant_predictions += 1
 
         correct = (
             predicted_answer
@@ -2024,23 +1924,7 @@ def evaluate_svamp(
         prediction_records.append(
             {
                 "index": example_index,
-                "id": str(
-                    example["ID"]
-                ),
-                "body": clean_text(
-                    example["Body"]
-                ),
-                "question": clean_text(
-                    example["Question"]
-                ),
-                "equation": clean_text(
-                    example["Equation"]
-                ),
-                "reference_answer_raw": (
-                    clean_text(
-                        example["Answer"]
-                    )
-                ),
+                "question": example["question"],
                 "reference_answer_normalized": (
                     ground_truth
                 ),
@@ -2054,7 +1938,16 @@ def evaluate_svamp(
                 "normalized_prediction": (
                     predicted_answer
                 ),
-                "parsed": parsed,
+                "parsed": bool(
+                    predicted_answer
+                ),
+                "unique_id": example["unique_id"],
+                "subject": example["subject"],
+                "level": example["level"],
+                "format_compliant": (
+                    format_compliant
+                ),
+                "truncated": truncated,
                 "correct": correct,
             }
         )
@@ -2070,19 +1963,26 @@ def evaluate_svamp(
             )
 
     accuracy = (
-        number_correct
-        / evaluation_count
+        number_correct / evaluation_count
     )
 
     parse_rate = (
-        valid_predictions
+        (evaluation_count - invalid_predictions)
+        / evaluation_count
+    )
+
+    format_compliance = (
+        compliant_predictions
+        / evaluation_count
+    )
+
+    truncation_rate = (
+        truncated_predictions
         / evaluation_count
     )
 
     os.makedirs(
-        os.path.dirname(
-            predictions_path
-        )
+        os.path.dirname(predictions_path)
         or ".",
         exist_ok=True,
     )
@@ -2102,17 +2002,29 @@ def evaluate_svamp(
             )
 
     print(
-        f"  [EVAL] SVAMP numeric accuracy: "
+        f"  [EVAL] MATH-500 exact match: "
         f"{accuracy:.6f} "
         f"({number_correct}/"
         f"{evaluation_count})"
     )
 
     print(
-        f"  [EVAL] Parsed predictions: "
-        f"{valid_predictions}/"
+        f"  [EVAL] Invalid predictions: "
+        f"{invalid_predictions}"
+    )
+
+    print(
+        f"  [EVAL] Format-compliant predictions: "
+        f"{compliant_predictions}/"
         f"{evaluation_count} "
-        f"({parse_rate:.6f})"
+        f"({format_compliance:.6f})"
+    )
+
+    print(
+        f"  [EVAL] Truncated generations: "
+        f"{truncated_predictions}/"
+        f"{evaluation_count} "
+        f"({truncation_rate:.6f})"
     )
 
     print(
@@ -2125,12 +2037,15 @@ def evaluate_svamp(
         number_correct,
         evaluation_count,
         parse_rate,
+        format_compliance,
+        truncation_rate,
     )
 
 
 # =============================================================================
 # Single experiment
 # =============================================================================
+
 
 def run_experiment(
     seed,
@@ -2144,7 +2059,7 @@ def run_experiment(
     print("\n" + "=" * 80)
 
     print(
-        f"SVAMP | protocol={PROTOCOL_ID} "
+        f"MATH-500 | protocol={PROTOCOL_ID} "
         f"| method={method} | seed={seed}"
     )
 
@@ -2156,40 +2071,17 @@ def run_experiment(
 
     print("=" * 80)
 
-    configure_reproducibility(
-        seed
-    )
+    configure_reproducibility(seed)
 
     sampled_training_examples = (
         sample_training_examples(
-            training_examples=(
-                training_pool
-            ),
+            training_examples=training_pool,
             seed=seed,
         )
     )
 
-    selected_ids = sorted(
-        str(example["ID"])
-        for example in (
-            sampled_training_examples
-        )
-    )
-
-    print(
-        f"[DATA] seed={seed} "
-        f"selected_train={len(selected_ids)}"
-    )
-
-    print(
-        "[DATA] selected_train_IDs="
-        + "|".join(selected_ids)
-    )
-
-    train_dataset = SVAMPDataset(
-        examples=(
-            sampled_training_examples
-        ),
+    train_dataset = MATHDataset(
+        examples=sampled_training_examples,
         tokenizer=tokenizer,
     )
 
@@ -2200,22 +2092,13 @@ def run_experiment(
     )
 
     callbacks = []
-    diagnostics_path = ""
-
-    diagnostics_directory = (
-        SMOKE_DIAGNOSTICS_DIR
-        if smoke
-        else DIAGNOSTICS_DIR
-    )
-
-    predictions_directory = (
-        SMOKE_PREDICTIONS_DIR
-        if smoke
-        else PREDICTIONS_DIR
-    )
 
     predictions_path = os.path.join(
-        predictions_directory,
+        (
+            SMOKE_PREDICTIONS_DIR
+            if smoke
+            else PREDICTIONS_DIR
+        ),
         (
             f"{PROTOCOL_ID}_"
             f"{method}_seed_{seed}"
@@ -2223,6 +2106,48 @@ def run_experiment(
             ".jsonl"
         ),
     )
+
+    maximum_evaluation_examples = (
+        SMOKE_EVAL_EXAMPLES
+        if smoke
+        else None
+    )
+
+    if method == "base":
+        (
+            accuracy,
+            number_correct,
+            evaluation_count,
+            parse_rate,
+            format_compliance,
+            truncation_rate,
+        ) = evaluate_math(
+            model=model,
+            tokenizer=tokenizer,
+            test_examples=test_examples,
+            test_answers=test_answers,
+            predictions_path=predictions_path,
+            max_eval=maximum_evaluation_examples,
+        )
+
+        del model
+        del train_dataset
+
+        gc.collect()
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        return {
+            "accuracy": accuracy,
+            "correct": number_correct,
+            "eval_examples": evaluation_count,
+            "parse_rate": parse_rate,
+            "format_compliance": format_compliance,
+            "truncation_rate": truncation_rate,
+            "train_wall_time": 0.0,
+            "predictions_file": predictions_path,
+        }
 
     if method == "lora":
         inject_lora(
@@ -2254,17 +2179,15 @@ def run_experiment(
             torch.cuda.empty_cache()
 
         os.makedirs(
-            diagnostics_directory,
+            DIAGNOSTICS_DIR,
             exist_ok=True,
         )
 
         diagnostics_path = os.path.join(
-            diagnostics_directory,
+            DIAGNOSTICS_DIR,
             (
                 f"{PROTOCOL_ID}_"
-                f"seed_{seed}"
-                f"{'_smoke' if smoke else ''}"
-                ".json"
+                f"seed_{seed}.json"
             ),
         )
 
@@ -2333,19 +2256,15 @@ def run_experiment(
     }
 
     try:
-        training_arguments = (
-            TrainingArguments(
-                eval_strategy="no",
-                **training_argument_values,
-            )
+        training_arguments = TrainingArguments(
+            eval_strategy="no",
+            **training_argument_values,
         )
 
     except TypeError:
-        training_arguments = (
-            TrainingArguments(
-                evaluation_strategy="no",
-                **training_argument_values,
-            )
+        training_arguments = TrainingArguments(
+            evaluation_strategy="no",
+            **training_argument_values,
         )
 
     trainer = Trainer(
@@ -2359,9 +2278,7 @@ def run_experiment(
         ),
     )
 
-    train_start_time = (
-        time.perf_counter()
-    )
+    train_start_time = time.perf_counter()
 
     training_result = trainer.train()
 
@@ -2385,9 +2302,8 @@ def run_experiment(
 
         if not pivot_callback.pivot_done:
             raise RuntimeError(
-                "Training finished without "
-                "executing the PivotLoRA "
-                "QR pivot."
+                "Training finished without executing "
+                "the PivotLoRA QR pivot."
             )
 
         if (
@@ -2395,69 +2311,36 @@ def run_experiment(
             is None
         ):
             raise RuntimeError(
-                "Pivot callback did not "
-                "record its global step."
+                "Pivot callback did not record its "
+                "global step."
             )
 
-        if pivot_callback.summary is None:
-            raise RuntimeError(
-                "Pivot callback did not "
-                "create diagnostics."
-            )
+    # Release the optimizer state and trainer before generation so the
+    # evaluation KV cache does not compete with them for GPU memory.
+    del trainer
+    del optimizer
 
-        if (
-            pivot_callback.summary[
-                "pivoted_modules"
-            ]
-            != 64
-        ):
-            raise RuntimeError(
-                "Pivot callback did not "
-                "process 64 adapters."
-            )
+    gc.collect()
 
-        if not pivot_callback.summary[
-            "all_updates_preserved"
-        ]:
-            raise RuntimeError(
-                "At least one adapter update "
-                "was not preserved."
-            )
-
-        if not pivot_callback.summary[
-            "all_bases_orthonormal"
-        ]:
-            raise RuntimeError(
-                "At least one post-pivot "
-                "basis was not orthonormal."
-            )
-
-    maximum_evaluation_examples = (
-        SMOKE_EVAL_EXAMPLES
-        if smoke
-        else None
-    )
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     (
         accuracy,
         number_correct,
         evaluation_count,
         parse_rate,
-    ) = evaluate_svamp(
+        format_compliance,
+        truncation_rate,
+    ) = evaluate_math(
         model=model,
         tokenizer=tokenizer,
         test_examples=test_examples,
         test_answers=test_answers,
-        predictions_path=(
-            predictions_path
-        ),
-        max_eval=(
-            maximum_evaluation_examples
-        ),
+        predictions_path=predictions_path,
+        max_eval=maximum_evaluation_examples,
     )
 
-    del trainer
-    del optimizer
     del model
     del train_dataset
 
@@ -2469,19 +2352,12 @@ def run_experiment(
     return {
         "accuracy": accuracy,
         "correct": number_correct,
-        "eval_examples": (
-            evaluation_count
-        ),
+        "eval_examples": evaluation_count,
         "parse_rate": parse_rate,
-        "train_wall_time": (
-            train_wall_time
-        ),
-        "predictions_file": (
-            predictions_path
-        ),
-        "diagnostics_file": (
-            diagnostics_path
-        ),
+        "format_compliance": format_compliance,
+        "truncation_rate": truncation_rate,
+        "train_wall_time": train_wall_time,
+        "predictions_file": predictions_path,
     }
 
 
@@ -2489,14 +2365,11 @@ def run_experiment(
 # Results persistence
 # =============================================================================
 
-def load_completed_results(
-    results_csv,
-):
+
+def load_completed_results(results_csv):
     completed = {}
 
-    if not os.path.exists(
-        results_csv
-    ):
+    if not os.path.exists(results_csv):
         return completed
 
     with open(
@@ -2516,10 +2389,7 @@ def load_completed_results(
                 ):
                     continue
 
-                if (
-                    int(row["n_train"])
-                    != N_TRAIN
-                ):
+                if int(row["n_train"]) != N_TRAIN:
                     continue
 
                 key = (
@@ -2530,7 +2400,7 @@ def load_completed_results(
                 completed[key] = {
                     "accuracy": float(
                         row[
-                            "svamp_numeric_accuracy"
+                            "math_exact_match"
                         ]
                     ),
                     "correct": int(
@@ -2539,25 +2409,10 @@ def load_completed_results(
                     "eval_examples": int(
                         row["eval_examples"]
                     ),
-                    "parse_rate": float(
-                        row["parse_rate"]
-                    ),
                     "train_wall_time": float(
                         row[
                             "train_wall_time_seconds"
                         ]
-                    ),
-                    "predictions_file": (
-                        row.get(
-                            "predictions_file",
-                            "",
-                        )
-                    ),
-                    "diagnostics_file": (
-                        row.get(
-                            "diagnostics_file",
-                            "",
-                        )
                     ),
                 }
 
@@ -2575,31 +2430,30 @@ def write_protocol_manifest(
     smoke=False,
 ):
     manifest_path = (
-        "svamp_response_pivot_matched_"
+        "math500_response_pivot_matched_v2_"
         f"{'smoke_' if smoke else ''}"
         "manifest.json"
     )
 
     manifest = {
         "protocol": PROTOCOL_ID,
-        "source_protocol": (
-            "gsm8k_response_pca_qr_matched_v1"
-        ),
         "model": MODEL_NAME,
-        "dataset": DATASET_NAME,
-        "task": (
-            "SVAMP completion-only SFT"
+        "task": "MATH completion-only SFT, MATH-500 evaluation",
+        "source_protocol": "gsm8k_response_pca_qr_matched_v2",
+        "train_dataset": TRAIN_DATASET,
+        "train_subjects": TRAIN_SUBJECTS,
+        "train_pool_rule": (
+            "prompt + solution + EOS <= MAX_SEQ_LEN tokens "
+            "and solution contains a \\boxed{} answer"
         ),
-        "official_train_examples": (
-            EXPECTED_TRAIN_EXAMPLES
+        "test_dataset": TEST_DATASET,
+        "scoring": (
+            "last \\boxed{} answer, Hendrycks MATH strip_string "
+            "normalization, exact match"
         ),
-        "official_test_examples": (
-            EXPECTED_TEST_EXAMPLES
-        ),
+        "preregistration": "paper/MATH500_PREREGISTRATION.md",
         "n_train": N_TRAIN,
-        "full_eval_examples": (
-            EXPECTED_TEST_EXAMPLES
-        ),
+        "full_eval_examples": EXPECTED_TEST_EXAMPLES,
         "rank": RANK,
         "alpha": ALPHA,
         "targets": TARGET_MODULES,
@@ -2610,9 +2464,7 @@ def write_protocol_manifest(
         ),
         "pivot_epoch": PIVOT_EPOCH,
         "batch_size": BATCH_SIZE,
-        "gradient_accumulation": (
-            GRAD_ACCUM
-        ),
+        "gradient_accumulation": GRAD_ACCUM,
         "effective_batch_size": (
             EFFECTIVE_BATCH_SIZE
         ),
@@ -2620,32 +2472,14 @@ def write_protocol_manifest(
             LEARNING_RATE
         ),
         "weight_decay": WEIGHT_DECAY,
-        "adam_betas": [
-            0.9,
-            0.999,
-        ],
-        "adam_epsilon": 1e-8,
         "scheduler": "linear",
         "warmup_steps": 0,
-        "training_format": (
-            "Question: {Body} {Question}\\n"
-            "Answer: Equation: {Equation}\\n"
-            "#### {Answer}"
-        ),
-        "completion_masking": (
-            "joint tokenization with "
-            "character offsets"
-        ),
         "pca_source": (
             "mean-pooled hidden states at "
             "positions predicting supervised "
             "response tokens"
         ),
-        "pca_solver": "randomized",
         "pca_random_rotation": False,
-        "pca_initialization_scale_multiplier": (
-            PCA_INITIALIZATION_SCALE_MULTIPLIER
-        ),
         "eigenvalue_learning_rates": False,
         "differential_B_learning_rate": False,
         "pivot": (
@@ -2657,15 +2491,19 @@ def write_protocol_manifest(
         ],
         "post_pivot_lr_override": False,
         "seeds": SEED_LIST,
-        "max_sequence_length": (
-            MAX_SEQ_LEN
+        "max_sequence_length": MAX_SEQ_LEN,
+        "max_new_tokens": MAX_NEW_TOKENS,
+        "prompt_template": PROMPT_TEMPLATE,
+        "completion": (
+            f"{COMPLETION_PREFIX!r} + answer field"
         ),
-        "max_new_tokens": (
-            MAX_NEW_TOKENS
+        "prompt_is_token_prefix": True,
+        "format_compliance": (
+            "fraction of generations containing \\boxed{}"
         ),
-        "evaluation": (
-            "greedy generation; numeric Answer "
-            "field accuracy"
+        "base_reference": (
+            "frozen pretrained model, no adapter "
+            "or training, evaluated once"
         ),
         "per_example_predictions": True,
     }
@@ -2691,6 +2529,7 @@ def write_protocol_manifest(
 # Study runner
 # =============================================================================
 
+
 def run_study(
     methods=None,
     seeds=None,
@@ -2711,17 +2550,15 @@ def run_study(
 
     print("Loading tokenizer...")
 
-    tokenizer = (
-        AutoTokenizer.from_pretrained(
-            MODEL_NAME,
-            use_fast=True,
-        )
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_NAME,
+        use_fast=True,
     )
 
     if not tokenizer.is_fast:
         raise RuntimeError(
-            "A fast tokenizer is required "
-            "for offset-based response masking."
+            "A fast tokenizer is required for "
+            "offset-based response masking."
         )
 
     if tokenizer.eos_token_id is None:
@@ -2740,31 +2577,25 @@ def run_study(
         training_pool,
         test_examples,
         test_answers,
-    ) = load_svamp_splits()
+    ) = load_math_splits(tokenizer)
 
     print(
-        f"[RESULTS] File: "
-        f"{results_csv}"
+        f"[RESULTS] File: {results_csv}"
     )
 
-    completed = (
-        load_completed_results(
-            results_csv
-        )
+    completed = load_completed_results(
+        results_csv
     )
 
     if completed:
         print(
             f"[RESUME] Found "
-            f"{len(completed)} valid "
-            "completed rows"
+            f"{len(completed)} valid completed rows"
         )
 
     needs_header = (
         not os.path.exists(results_csv)
-        or os.path.getsize(
-            results_csv
-        ) == 0
+        or os.path.getsize(results_csv) == 0
     )
 
     results_handle = open(
@@ -2786,9 +2617,16 @@ def run_study(
     all_scores = defaultdict(dict)
 
     try:
-        # Preserve the frozen GSM8K study-loop ordering.
         for method in methods:
-            for seed in seeds:
+            # Greedy evaluation of the frozen model does not depend on
+            # the training sample, so the base reference runs once.
+            method_seeds = (
+                seeds[:1]
+                if method == "base"
+                else seeds
+            )
+
+            for seed in method_seeds:
                 key = (
                     method,
                     seed,
@@ -2814,15 +2652,9 @@ def run_study(
                     result = run_experiment(
                         seed=seed,
                         method=method,
-                        training_pool=(
-                            training_pool
-                        ),
-                        test_examples=(
-                            test_examples
-                        ),
-                        test_answers=(
-                            test_answers
-                        ),
+                        training_pool=training_pool,
+                        test_examples=test_examples,
+                        test_answers=test_answers,
                         tokenizer=tokenizer,
                         smoke=smoke,
                     )
@@ -2833,15 +2665,7 @@ def run_study(
 
                     writer.writerow(
                         {
-                            "protocol": (
-                                PROTOCOL_ID
-                            ),
-                            "dataset": (
-                                DATASET_NAME
-                            ),
-                            "model": (
-                                MODEL_NAME
-                            ),
+                            "protocol": PROTOCOL_ID,
                             "method": method,
                             "seed": seed,
                             "n_train": N_TRAIN,
@@ -2851,15 +2675,19 @@ def run_study(
                                 ]
                             ),
                             "correct": (
-                                result[
-                                    "correct"
-                                ]
+                                result["correct"]
                             ),
-                            "svamp_numeric_accuracy": (
+                            "math_exact_match": (
                                 f"{result['accuracy']:.9f}"
                             ),
                             "parse_rate": (
                                 f"{result['parse_rate']:.9f}"
+                            ),
+                            "format_compliance": (
+                                f"{result['format_compliance']:.9f}"
+                            ),
+                            "truncation_rate": (
+                                f"{result['truncation_rate']:.9f}"
                             ),
                             "train_wall_time_seconds": (
                                 f"{result['train_wall_time']:.2f}"
@@ -2869,11 +2697,6 @@ def run_study(
                                     "predictions_file"
                                 ]
                             ),
-                            "diagnostics_file": (
-                                result[
-                                    "diagnostics_file"
-                                ]
-                            ),
                         }
                     )
 
@@ -2881,8 +2704,7 @@ def run_study(
 
                 except Exception as exception:
                     print(
-                        f"[CRASH] "
-                        f"{method}-s{seed}: "
+                        f"[CRASH] {method}-s{seed}: "
                         f"{exception}"
                     )
 
@@ -2899,9 +2721,8 @@ def run_study(
     print("\n" + "=" * 80)
 
     print(
-        "SVAMP ADDITIONAL-DATASET RESULT: "
-        "MATCHED-OPTIMIZER RESPONSE-POSITION "
-        "PIVOTLORA"
+        "MATH-500 RESULT: MATCHED-OPTIMIZER "
+        "RESPONSE-POSITION PIVOTLORA"
     )
 
     print(
@@ -2910,10 +2731,6 @@ def run_study(
 
     print(
         f"Model: {MODEL_NAME}"
-    )
-
-    print(
-        f"Dataset: {DATASET_NAME}"
     )
 
     print(
@@ -2933,11 +2750,9 @@ def run_study(
     print("-" * 80)
 
     for method in METHODS:
-        method_results = (
-            all_scores.get(
-                method,
-                {},
-            )
+        method_results = all_scores.get(
+            method,
+            {},
         )
 
         if not method_results:
@@ -2960,9 +2775,7 @@ def run_study(
         )
 
         standard_deviation = (
-            float(
-                scores.std(ddof=1)
-            )
+            float(scores.std(ddof=1))
             if len(scores) > 1
             else 0.0
         )
@@ -2997,15 +2810,13 @@ def run_study(
     )
 
     if common_seeds:
-        paired_differences = (
-            np.asarray(
-                [
-                    pivot_results[seed]
-                    - lora_results[seed]
-                    for seed in common_seeds
-                ],
-                dtype=np.float64,
-            )
+        paired_differences = np.asarray(
+            [
+                pivot_results[seed]
+                - lora_results[seed]
+                for seed in common_seeds
+            ],
+            dtype=np.float64,
         )
 
         print(
@@ -3040,23 +2851,15 @@ def run_study(
     )
 
     print(
-        "  - implementation copied from the "
-        "frozen GSM8K protocol"
+        "  - identical AdamW optimizer for both methods"
     )
 
     print(
-        "  - identical AdamW optimizer for "
-        "both methods"
+        "  - identical base LR and linear scheduler"
     )
 
     print(
-        "  - identical base LR and linear "
-        "scheduler"
-    )
-
-    print(
-        "  - no eigenvalue or differential "
-        "B learning rates"
+        "  - no eigenvalue or differential B learning rates"
     )
 
     print(
@@ -3064,28 +2867,16 @@ def run_study(
     )
 
     print(
-        "  - joint prompt/completion "
-        "tokenization with offset masking"
+        "  - completion-only response-position PCA"
     )
 
     print(
-        "  - completion-only "
-        "response-position PCA"
+        f"  - output-preserving QR after epoch "
+        f"{PIVOT_EPOCH}"
     )
 
     print(
-        f"  - output-preserving QR after "
-        f"epoch {PIVOT_EPOCH}"
-    )
-
-    print(
-        "  - Adam state reset for both "
-        "transformed factors"
-    )
-
-    print(
-        "  - official 700-example train and "
-        "300-example test splits"
+        "  - Adam state reset for both transformed factors"
     )
 
     print("=" * 80)
@@ -3094,6 +2885,7 @@ def run_study(
 # =============================================================================
 # Entry point
 # =============================================================================
+
 
 if __name__ == "__main__":
     report_hardware()
@@ -3104,10 +2896,9 @@ if __name__ == "__main__":
         "--smoke",
         action="store_true",
         help=(
-            "Run both methods for four epochs "
-            "on seed 42 and evaluate 50 examples. "
-            "This smoke test reaches the "
-            "epoch-3 pivot."
+            "Run both methods for four epochs on "
+            "seed 42 and evaluate 50 examples. "
+            "This smoke test reaches the epoch-3 pivot."
         ),
     )
 
@@ -3124,8 +2915,18 @@ if __name__ == "__main__":
         default=None,
         help=(
             "Use the first K seeds from "
-            "[42, 43, 44]. For example, "
-            "--seeds 1 runs seed 42."
+            "[42, 43, 44]."
+        ),
+    )
+
+    parser.add_argument(
+        "--smoke-epochs",
+        type=int,
+        default=None,
+        help=(
+            "Pipeline check at a different training "
+            "length (e.g. 15, the full protocol). "
+            "Writes to separate _e<N> smoke files."
         ),
     )
 
@@ -3133,13 +2934,13 @@ if __name__ == "__main__":
 
     if (
         arguments.seeds is not None
-        and not 1
-        <= arguments.seeds
-        <= len(SEED_LIST)
+        and not 1 <= arguments.seeds <= len(
+            SEED_LIST
+        )
     ):
         parser.error(
-            f"--seeds must be between 1 "
-            f"and {len(SEED_LIST)}"
+            f"--seeds must be between 1 and "
+            f"{len(SEED_LIST)}"
         )
 
     selected_seeds = (
@@ -3148,9 +2949,21 @@ if __name__ == "__main__":
         else SEED_LIST
     )
 
+    if arguments.smoke and arguments.smoke_epochs is not None:
+        # Module-level settings are read at call time, so reassigning them
+        # here keeps this check separate from the default 4-epoch check.
+        SMOKE_EPOCHS = arguments.smoke_epochs
+        SMOKE_RESULTS_CSV = SMOKE_RESULTS_CSV.replace(
+            "_smoke.csv",
+            f"_smoke_e{SMOKE_EPOCHS}.csv",
+        )
+        SMOKE_PREDICTIONS_DIR = (
+            f"{SMOKE_PREDICTIONS_DIR}_e{SMOKE_EPOCHS}"
+        )
+
     if arguments.smoke:
         run_study(
-            methods=METHODS,
+            methods=arguments.methods or METHODS,
             seeds=[42],
             smoke=True,
         )

@@ -186,12 +186,20 @@ def verify_reasoning(verbose: bool) -> None:
     print("\nGenerated-answer reasoning (results/reasoning.csv)")
     rows = load("reasoning.csv")
 
-    for dataset, n_test, lora_mean, pivot_mean, gain, gain_sd, positive in [
-        ("gsm8k", 1319, 23.88, 25.37, 1.49, 1.84, 2),
-        ("svamp", 300, 23.11, 55.00, 31.89, 16.57, 3),
+    for dataset, n_test, base_acc, lora_mean, pivot_mean, gain, gain_sd, positive in [
+        ("gsm8k", 1319, 25.63, 28.68, 33.23, 4.55, 2.31, 3),
+        ("strategyqa", 687, 54.44, 64.14, 67.73, 3.59, 3.11, 2),
     ]:
-        subset = [r for r in rows if r["dataset"] == dataset]
-        check(f"{dataset}: 6 runs", len(subset) == 6, f"{len(subset)}")
+        all_rows = [r for r in rows if r["dataset"] == dataset]
+        base = [r for r in all_rows if r["method"] == "Base"]
+        subset = [r for r in all_rows if r["method"] != "Base"]
+        check(f"{dataset}: 6 paired runs + 1 base reference",
+              len(subset) == 6 and len(base) == 1, f"{len(subset)} + {len(base)}")
+        check(f"{dataset} base model = {base_acc}%",
+              close(float(base[0]["accuracy_pct"]), base_acc, 0.005), base[0]["accuracy_pct"])
+        check(f"{dataset}: trained-run format compliance >= 95%",
+              all(float(r["format_compliance_pct"]) >= 95.0 for r in subset),
+              f"min {min(float(r['format_compliance_pct']) for r in subset):.2f}%")
 
         by_method = {
             m: {int(r["seed"]): float(r["accuracy_pct"]) for r in subset if r["method"] == m}
@@ -368,12 +376,12 @@ def verify_pivot_diagnostics(verbose: bool) -> None:
 
     pres = [float(r["max_preservation_error"]) for r in reasoning]
     orth = [float(r["orthogonality_error_after"]) for r in reasoning]
-    check("max preservation error = 1.33e-7", close(max(pres) * 1e7, 1.33, 0.005), f"{max(pres):.3e}")
-    check("preservation range ~1.25e-7 to 1.33e-7",
-          close(min(pres) * 1e7, 1.25, 0.005), f"{min(pres):.3e} .. {max(pres):.3e}")
-    check("max orthogonality error = 2.38e-8", close(max(orth) * 1e8, 2.38, 0.005), f"{max(orth):.3e}")
-    check("orthogonality range ~1.13e-8 to 2.38e-8",
-          close(min(orth) * 1e8, 1.13, 0.005), f"{min(orth):.3e} .. {max(orth):.3e}")
+    check("max preservation error = 1.44e-7", close(max(pres) * 1e7, 1.44, 0.005), f"{max(pres):.3e}")
+    check("preservation range ~1.26e-7 to 1.44e-7",
+          close(min(pres) * 1e7, 1.26, 0.005), f"{min(pres):.3e} .. {max(pres):.3e}")
+    check("max orthogonality error = 3.51e-8", close(max(orth) * 1e8, 3.51, 0.005), f"{max(orth):.3e}")
+    check("orthogonality range ~1.74e-8 to 3.51e-8",
+          close(min(orth) * 1e8, 1.74, 0.005), f"{min(orth):.3e} .. {max(orth):.3e}")
 
     classification = [r for r in rows if r["experiment_family"] == "classification"]
     check("classification residuals all below 1e-6",

@@ -1,5 +1,5 @@
 {
-  "protocol": "gsm8k_response_pca_qr_matched_v1",
+  "protocol": "gsm8k_response_pca_qr_matched_v2",
   "model": "meta-llama/Llama-3.1-8B",
   "task": "GSM8K completion-only SFT",
   "n_train": 128,
@@ -35,5 +35,11 @@
     44
   ],
   "max_sequence_length": 512,
-  "max_new_tokens": 512
+  "max_new_tokens": 512,
+  "prompt_template": "Question: {question}\nAnswer:",
+  "completion": "' ' + answer field",
+  "prompt_is_token_prefix": true,
+  "format_compliance": "fraction of generations ending in '\\n#### <number>'",
+  "base_reference": "frozen pretrained model, no adapter or training, evaluated once",
+  "per_example_predictions": true
 }

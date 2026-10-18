@@ -1,7 +1,7 @@
 """Checks that the released numeric evaluator behaves as documented.
 
 These are the handcrafted cases the reproducibility checklist calls for, plus
-the boundary cases that distinguish the GSM8K/SVAMP scorer from a naive
+the boundary cases that distinguish the GSM8K scorer from a naive
 "find a number" parser. No model outputs are re-evaluated here.
 
 Run with ``pytest tests/`` or directly with ``python tests/test_answer_parser.py``.
@@ -73,7 +73,7 @@ def test_gsm8k_style_reference_answer():
     assert extract_answer(reference) == "72"
 
 
-def test_svamp_style_completion():
+def test_equation_then_answer_completion():
     assert extract_answer("Equation: ( 62.0 - 35.0 )\n#### 27") == "27"
 
 

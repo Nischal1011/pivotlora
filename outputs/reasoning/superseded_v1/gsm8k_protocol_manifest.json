@@ -1,13 +1,9 @@
 {
-  "protocol": "svamp_response_pca_qr_matched_v1",
-  "source_protocol": "gsm8k_response_pca_qr_matched_v1",
+  "protocol": "gsm8k_response_pca_qr_matched_v1",
   "model": "meta-llama/Llama-3.1-8B",
-  "dataset": "ChilleD/SVAMP",
-  "task": "SVAMP completion-only SFT",
-  "official_train_examples": 700,
-  "official_test_examples": 300,
+  "task": "GSM8K completion-only SFT",
   "n_train": 128,
-  "full_eval_examples": 300,
+  "full_eval_examples": 1319,
   "rank": 8,
   "alpha": 16,
   "targets": [
@@ -21,19 +17,10 @@
   "effective_batch_size": 8,
   "base_learning_rate": 0.0002,
   "weight_decay": 0.01,
-  "adam_betas": [
-    0.9,
-    0.999
-  ],
-  "adam_epsilon": 1e-08,
   "scheduler": "linear",
   "warmup_steps": 0,
-  "training_format": "Question: {Body} {Question}\\nAnswer: Equation: {Equation}\\n#### {Answer}",
-  "completion_masking": "joint tokenization with character offsets",
   "pca_source": "mean-pooled hidden states at positions predicting supervised response tokens",
-  "pca_solver": "randomized",
   "pca_random_rotation": false,
-  "pca_initialization_scale_multiplier": 2.23606797749979,
   "eigenvalue_learning_rates": false,
   "differential_B_learning_rate": false,
   "pivot": "FP64 output-preserving reduced QR",
@@ -48,7 +35,5 @@
     44
   ],
   "max_sequence_length": 512,
-  "max_new_tokens": 512,
-  "evaluation": "greedy generation; numeric Answer field accuracy",
-  "per_example_predictions": true
+  "max_new_tokens": 512
 }

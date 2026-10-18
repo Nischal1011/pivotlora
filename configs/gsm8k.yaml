@@ -8,7 +8,7 @@
 # optimizer, schedule, tokenization, completion mask, training budget, decoding,
 # and scorer. PivotLoRA adds only the PCA initialization and the single pivot.
 
-experiment: gsm8k_response_pca_qr_matched_v1
+experiment: gsm8k_response_pca_qr_matched_v2
 script: src/train_reasoning_gsm8k.py
 
 model:
@@ -57,7 +57,7 @@ initialization:
   pca_solver: randomized
   pca_precision: float32
   pca_random_rotation: false
-  basis_scale: 2.23606797749979         # sqrt(5); NOT norm-matched to Kaiming
+  basis_scale: sqrt(5/d)                # = 0.0349 for d = 4096; NOT norm-matched to Kaiming
   init_B: zeros
 
 pivot:
@@ -78,7 +78,8 @@ data:
   sampling: numpy.random.default_rng(seed).choice(7473, 128, replace=False)
   manifests: manifests/gsm8k/
   prompt_template: "Question: {question}\nAnswer:"
-  completion: the dataset's original answer field
+  completion: "' ' + the dataset's original answer field"   # leading space: the prompt
+                                  # is an exact token prefix of the training sequence
   completion_masking: >-
     joint tokenization with character offsets; prompt tokens are set to -100;
     completion tokens and the appended EOS are supervised
@@ -92,6 +93,8 @@ generation:
 
 evaluation:
   metric: numeric exact match
+  format_compliance: 'fraction of generations ending in "\n#### <number>"'
+  base_reference: frozen Llama-3.1-8B without adapters, evaluated once
   parser: src/evaluation.py
   rule: >-
     first number after the final '####'; otherwise the last number in the

@@ -10,7 +10,9 @@ names where it came from:
 
 Run `python analysis/verify_results.py` from the repository root to recompute
 every derived statistic from these CSVs — 137 checks, no model or GPU needed.
-Standard deviations are sample standard deviations (ddof = 1) throughout.
+Standard deviations are sample standard deviations (ddof = 1), except the
+Llama-3.1-8B EVA and BoolQ rows in `decoder_classification.csv`, which are
+population values (ddof = 0) because their per-seed scores were not retained.
 
 ---
 
@@ -49,21 +51,38 @@ Llama-3.1-8B. EVA was evaluated only at N=64.
 PivotLoRA has the highest mean on all five N=64 settings. At N=256 the
 differences shrink and it is not uniformly best.
 
-### `reasoning.csv` — GSM8K and SVAMP
+### `reasoning.csv` — GSM8K and StrategyQA
 
-`dataset, model, method, seed, n_train, n_test, correct, accuracy_pct, invalid, parse_rate_pct, source`
+`dataset, model, method, seed, n_train, n_test, correct, accuracy_pct, invalid, parse_rate_pct, format_compliance_pct, protocol, source`
 
-All twelve runs (2 datasets × 2 methods × 3 seeds) on the complete test split:
-1,319 for GSM8K, 300 for SVAMP.
+All paired runs (2 datasets × 2 methods × 3 seeds) plus one frozen base-model
+reference per dataset (`method = Base`, `seed = none`), on the complete test
+split: 1,319 for GSM8K and 687 for StrategyQA.
+`format_compliance_pct` is the share of generations that follow the trained
+answer format.
 
-| | LoRA mean | PivotLoRA mean | Mean paired gain | Gain SD | Positive seeds |
-|---|---|---|---|---|---|
-| GSM8K | 23.88% | 25.37% | **+1.49 pp** | 1.84 | 2/3 |
-| SVAMP | 23.11% | 55.00% | **+31.89 pp** | 16.57 | 3/3 |
+| | Base | LoRA mean | PivotLoRA mean | Mean paired gain | Gain SD | Positive seeds |
+|---|---|---|---|---|---|---|
+| GSM8K | 25.63% | 28.68% | 33.23% | **+4.55 pp** | 2.31 | 3/3 |
+| StrategyQA | 54.44% | 64.14% | 67.73% | **+3.59 pp** | 3.11 | 2/3 (one tie) |
 
-These are complete-procedure results: initialization, basis scale (√5), and
-pivot-state handling vary jointly, so they do not isolate subspace direction.
-GSM8K seed 42 is −0.61 pp; the SVAMP gains are +25.67, +19.33, +50.67 pp.
+These are complete-procedure results: initialization, basis scale (√(5/d)),
+and pivot-state handling vary jointly, so they do not isolate subspace
+direction. These are the v2 protocol results; see the main README for the
+prompt-boundary fix, and `outputs/reasoning/superseded_v1/` for the
+superseded runs.
+
+### `baseline_fidelity.csv` — PiSSA and LoRAM fidelity audit
+
+`block, task, n, method, mean, std, num_seeds, source`
+
+The classification LoRA layer multiplies every supplied `A` initialization by
+√(5/d), which rescales the baselines' intended magnitudes. Two matched N=64,
+three-seed audits check whether this matters: the reference PEFT PiSSA against
+ours (`pissa` block), and LoRAM at its intended log(1+σ_max) magnitude against
+ours (`loram` block, from `src/loram_fidelity_check.py`). Neither changes the
+baseline conclusions. Compare within a block; raw per-seed scores are in
+`outputs/bert/baseline_fidelity/`.
 
 ### `tuned_comparison.csv` — learning-rate sensitivity
 
@@ -127,9 +146,10 @@ not `bert_main.csv` — are the reference for the three variants.
 `experiment_family, task_or_dataset, seed, adapters_pivoted, pivot_epoch, pivot_step, mean_preservation_error, max_preservation_error, mean_span_residual, orthogonality_error_before, orthogonality_error_after, mean_alignment_change, optimizer_state_reset, source`
 
 Reasoning rows are per-seed values from the run artifacts; all 64 adapters
-transform at epoch 3 / global step 48 in every run. Maximum relative
-preservation error 1.33e-7 (range 1.25e-7–1.33e-7); maximum post-pivot
-orthogonality error 2.38e-8 (range 1.13e-8–2.38e-8).
+transform at epoch 3 / global step 48 in every run (six runs: two datasets ×
+three seeds). Maximum relative preservation error 1.44e-7 (range
+1.26e-7–1.44e-7); maximum post-pivot orthogonality error 3.51e-8 (range
+1.74e-8–3.51e-8).
 
 Classification rows aggregate three seeds and 72 adapter instances per task.
 `orthogonality_error_before = 2.809` shows how far the input factor drifts
