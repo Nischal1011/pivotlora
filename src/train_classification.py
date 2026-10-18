@@ -62,6 +62,11 @@ TASK_INFO = {
                  "num_labels": 3, "metric": "accuracy", "is_regression": False, "task_type": "cls"},
     "qnli":     {"dataset": ("nyu-mll/glue", "qnli"),    "text_fields": ["question", "sentence"],
                  "num_labels": 2, "metric": "accuracy", "is_regression": False, "task_type": "cls"},
+    # Auxiliary task for the alignment analysis (not in the default task list).
+    # Labels are the Boolean "answer" field, cast to {0, 1}.
+    "boolq":    {"dataset": ("google/boolq",),           "text_fields": ["question", "passage"],
+                 "label_key": "answer",
+                 "num_labels": 2, "metric": "accuracy", "is_regression": False, "task_type": "cls"},
 }
 
 # ==================== METHOD CONFIG TABLE ====================
@@ -186,6 +191,9 @@ def load_task_with_splits(task_name, n_shot, seed):
         return tokenizer(*args, truncation=True, max_length=128, padding="max_length")
 
     dataset = dataset.map(tokenize, batched=True)
+    if "label_key" in info:
+        key = info["label_key"]
+        dataset = dataset.map(lambda ex: {"label": [int(v) for v in ex[key]]}, batched=True)
     dataset = dataset.rename_column("label", "labels")
     dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
@@ -1620,6 +1628,10 @@ def run_full_reference(tasks=None):
 
 if __name__ == "__main__":
     import argparse
+    import sys
+    # The summary tables use box-drawing characters; avoid cp1252 errors on Windows consoles.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--smoke_methods", nargs="+", default=["lora", "eigenlora"])

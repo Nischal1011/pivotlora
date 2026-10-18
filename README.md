@@ -148,6 +148,9 @@ python src/train_classification.py --tasks sst2 --shots 64 --seeds 3 \
 
 # Smoke test (short run, one seed).
 python src/train_classification.py --smoke
+
+# BoolQ, the auxiliary seventh task used in the alignment analysis.
+python src/train_classification.py --tasks boolq --seeds 3
 ```
 
 Config: [`configs/bert_classification.yaml`](configs/bert_classification.yaml) ·

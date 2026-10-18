@@ -27,6 +27,7 @@ are replaced with `<workdir>`.
 |---|---|
 | `main_bert_results.csv` | per-seed scores, 6 tasks × 5 N × 3 seeds × 13 methods |
 | `ablation_pivot_epoch.csv` | pivot timing K |
+| `boolq_check.csv` | BoolQ rerun of LoRA, TT-PCA (`eigenlora`), and PivotLoRA at N=16 and 64 with the released script |
 | `ablation_optimizer_state.csv` | optimizer-state reset policy |
 | `direction_vs_lr.csv` | direction versus eigenvalue-scaled rates |
 | `lr_sweep_agnews.csv` | AG News learning-rate sensitivity |
