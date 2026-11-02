@@ -1,0 +1,13 @@
+task,shot,method,seed,score
+sst2,64,eva,42,0.738532
+sst2,64,eva,43,0.733945
+sst2,64,eva,44,0.704128
+sst2,256,eva,42,0.930046
+sst2,256,eva,43,0.942661
+sst2,256,eva,44,0.911697
+agnews,64,eva,42,0.705789
+agnews,64,eva,43,0.776579
+agnews,64,eva,44,0.740000
+agnews,256,eva,42,0.875395
+agnews,256,eva,43,0.882632
+agnews,256,eva,44,0.879211

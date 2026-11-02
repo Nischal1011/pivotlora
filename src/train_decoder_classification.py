@@ -53,7 +53,7 @@ PIVOT_WARMUP_STEPS = 10
 
 SEED_LIST = [42, 43, 44]
 SHOTS = [64, 256]
-METHODS = ["lora", "pivotlora", "pissa", "loram"]
+METHODS = ["lora", "pivotlora", "pissa", "loram", "eva"]
 
 TASK_INFO = {
     "sst2": {"dataset": ("nyu-mll/glue", "sst2"), "text_fields": ["sentence"],
@@ -271,9 +271,67 @@ def get_subspaces(model, dataset, rank, seed):
     return dict(subspaces), dict(eig_dict)
 
 
+def get_eva_subspaces(model, dataset, rank):
+    """EVA-style all-token activation subspace (Paischer et al., 2025).
+
+    Pools the adapter inputs of every non-padding token in the training set,
+    computes the top-`rank` principal directions of their centered covariance,
+    and uses them as the input factor with a uniform learning rate. Rank is
+    uniform across layers (EVA's optional rank redistribution is disabled for a
+    matched rank budget). q_proj and v_proj receive the same input, so one
+    covariance per layer serves both. Sums are accumulated on the GPU in
+    float32, so raw activations are never stored.
+    """
+    print("[EVA] Accumulating all-token covariance...")
+    model.eval()
+    layers = get_llama_layers(model)
+    stats = {}
+    mask_holder = {}
+
+    def make_hook(idx):
+        def hook(module, inputs):
+            x = inputs[0].detach().float()
+            m = mask_holder["mask"].to(x.device).bool()
+            xs = x[m]                                  # (tokens, d)
+            if idx not in stats:
+                d = xs.shape[1]
+                stats[idx] = [torch.zeros(d, device=x.device),
+                              torch.zeros(d, d, device=x.device), 0]
+            stats[idx][0] += xs.sum(0)
+            stats[idx][1] += xs.T @ xs
+            stats[idx][2] += xs.shape[0]
+        return hook
+
+    handles = [layer.self_attn.q_proj.register_forward_pre_hook(make_hook(i))
+               for i, layer in enumerate(layers)]
+    input_device = get_input_device(model)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=False)
+    with torch.no_grad():
+        for batch in loader:
+            mask_holder["mask"] = batch["attention_mask"]
+            model(**{k: v.to(input_device) for k, v in batch.items() if k != "labels"})
+    for h in handles:
+        h.remove()
+
+    subspaces = {}
+    for idx, (s1, s2, n) in stats.items():
+        mean = s1 / n
+        cov = s2 / n - torch.outer(mean, mean)
+        evals, evecs = torch.linalg.eigh(cov)
+        Q = evecs[:, -rank:].flip(1).cpu()
+        expl = (evals[-rank:].sum() / evals.sum()).item() * 100
+        subspaces[idx] = {"q_proj": Q, "v_proj": Q}
+        if idx in (0, len(stats) // 2, len(stats) - 1):
+            print(f"  [EVA] layer {idx:>2}: {n} tokens, top-{rank} explained {expl:.1f}%")
+    del stats
+    torch.cuda.empty_cache()
+    print("[EVA] Done.")
+    return subspaces
+
+
 def inject_llama(model, rank, method, block_subspaces=None,
                  eigenvalues_dict=None, track_A_init=False,
-                 b_inits=None, subtract_residual=False):
+                 b_inits=None, subtract_residual=False, rotate=True):
     layers = get_llama_layers(model)
     count = 0
     for i, layer in enumerate(layers):
@@ -289,7 +347,7 @@ def inject_llama(model, rank, method, block_subspaces=None,
             if b_inits and i in b_inits and target_name in b_inits[i]:
                 curr_A, curr_B = b_inits[i][target_name]
 
-            if curr_A is not None and curr_B is None:
+            if curr_A is not None and curr_B is None and rotate:
                 rot_seed = f"layer_{i}_{target_name}"
                 seed_int = int.from_bytes(hashlib.sha256(rot_seed.encode()).digest()[:4], "little")
                 g = torch.Generator(device=layer_device); g.manual_seed(seed_int)
@@ -457,6 +515,11 @@ def run_experiment(task, shot, seed, method):
         inject_llama(model, RANK, method, b_inits=b_inits)
         optimizer = build_optimizer(model, use_eigen=False)
 
+    elif method == "eva":
+        subspaces = get_eva_subspaces(model, train_ds, RANK)
+        inject_llama(model, RANK, method, block_subspaces=subspaces, rotate=False)
+        optimizer = build_optimizer(model, use_eigen=False)
+
     else:
         raise ValueError(f"Unknown method: {method}")
 
@@ -547,7 +610,7 @@ def run_study(methods=None, shots=None, seeds=None, tasks=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Decoder-scale few-shot classification: LoRA, PiSSA, LoRAM, "
-                    "and PivotLoRA. The same protocol is used for every backbone; "
+                    "EVA, and PivotLoRA. The same protocol is used for every backbone; "
                     "only --model changes between the reported studies.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
