@@ -1,0 +1,6 @@
+variant,sst2,cola,agnews,average,wins_vs_ttpca_of_15,source
+TT-PCA (no pivot),0.697,0.257,0.717,0.557,,ablations/post_pivot_lr/pivot_lr_ablation.csv
+"Pivot, no rate change",0.734,0.275,0.770,0.593,11,ablations/post_pivot_lr/pivot_lr_ablation.csv
+"Pivot, implemented policy",0.728,0.276,0.772,0.592,12,ablations/post_pivot_lr/pivot_lr_ablation.csv
+"Pivot, uniform rate",0.744,0.266,0.777,0.596,13,ablations/post_pivot_lr/pivot_lr_ablation.csv
+"Pivot, ramp then uniform rate",0.723,0.265,0.766,0.585,12,ablations/post_pivot_lr/pivot_lr_ablation.csv

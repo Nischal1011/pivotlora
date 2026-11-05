@@ -46,4 +46,8 @@ the reported values.
 `decoder/llama31_results.csv` is the per-seed Llama-3.1-8B classification
 output. `decoder/eva_llama2_results.csv` and `decoder/eva_llama31_results.csv`
 are the per-seed EVA runs (N = 64 and 256) from
-`src/train_decoder_classification.py --methods eva`. `summarization/{xsum,cnndm}.csv` are the GPT-2 ROUGE-L controls.
+`src/train_decoder_classification.py --methods eva`. `summarization/superseded_v1/{xsum,cnndm}.csv` are the original GPT-2 runs under
+the classification learning-rate recipe with sequence-mean pooling. They are
+kept for the record and are not reported in the camera-ready. The paper's
+summarization table (Appendix E.4) comes from the matched 2×2 sweep in
+[`../ablations/gpt2_summarization/`](../ablations/gpt2_summarization/).

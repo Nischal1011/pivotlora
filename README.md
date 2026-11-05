@@ -37,8 +37,9 @@ PivotLoRA has the best average rank and beats vanilla LoRA in 29 of 30
 settings. Decoder-scale classification reproduces the low-shot pattern on
 Llama-2-7B and Llama-3.1-8B. With Llama-3.1-8B, a response-position extension
 gives mean paired gains of +4.55 pp on GSM8K (3/3 seeds) and +3.59 pp on
-StrategyQA, while full-data classification and
-mean-pooled summarization show little or no directional advantage.
+StrategyQA. Full-data classification shows no directional advantage, and on
+GPT-2 summarization PivotLoRA is competitive with LoRA but not decisively
+better, which shows that a large `d/N` alone is not enough.
 
 ---
 
@@ -128,7 +129,7 @@ python src/lr_sweep.py --probe                       # sweep grid, no training
 python src/activation_source_ablation.py --probe     # ablation grid, no training
 ```
 
-`analysis/verify_results.py` runs 137 checks covering every headline number.
+`analysis/verify_results.py` runs 144 checks covering every headline number.
 
 ---
 
@@ -253,9 +254,20 @@ python src/optimizer_state_ablation.py              # optimizer-state reset poli
 python src/direction_vs_lr_ablation.py              # direction vs. eigenvalue-scaled LR
 python src/lr_sweep.py                              # learning-rate sensitivity
 python src/full_finetune_baseline.py                # full fine-tuning reference
-python src/summarization_xsum.py                    # sequence-mean control
-python src/summarization_cnndm.py                   # sequence-mean control
+python src/summarization_xsum.py                    # GPT-2 XSum harness (used by the 2x2 sweep below)
+python src/summarization_cnndm.py                   # GPT-2 CNN/DailyMail harness
 python src/validate_spiked_covariance.py            # synthetic theory validation
+```
+
+Two camera-ready ablations live in [`ablations/`](ablations/), each with its
+script and per-seed results (see [`ablations/README.md`](ablations/README.md)):
+
+```bash
+# Appendix F.10: post-pivot B learning-rate policy (5 variants incl. TT-PCA).
+python ablations/post_pivot_lr/pivot_lr_ablation.py
+# Appendix E.4: GPT-2 summarization, activation source x learning-rate recipe.
+python ablations/gpt2_summarization/gpt2_response_ablation.py \
+    --variants lora pivot_seqmean pivot_resp pivot_seqmean_unilr pivot_resp_unilr
 ```
 
 > **Heads up:** `compute_rho.py`, `validate_spiked_covariance.py`,
@@ -285,7 +297,13 @@ python src/validate_spiked_covariance.py            # synthetic theory validatio
 | Figure 3 + Appendix — alignment ρ vs. gain | — | `results/alignment.csv` | [`outputs/bert/alignment/`](outputs/bert/alignment/) |
 | Appendix — activation-source ablation (E.12) | `configs/activation_source_ablation.yaml` | `results/activation_source.csv` | [`outputs/bert/activation_source_raw.csv`](outputs/bert/activation_source_raw.csv) |
 | Appendix — direction vs. learning-rate controls | `configs/lr_sweep.yaml` | `results/direction_controls.csv` | [`outputs/bert/direction_vs_lr.csv`](outputs/bert/direction_vs_lr.csv) |
-| Appendix — summarization, full-data, full fine-tuning | — | `results/regime_controls.csv` | [`outputs/summarization/`](outputs/summarization/), [`outputs/bert/full_data_audit.csv`](outputs/bert/full_data_audit.csv), [`outputs/bert/full_finetune_baseline.csv`](outputs/bert/full_finetune_baseline.csv) |
+| Appendix E.4 — GPT-2 summarization control (2×2 sweep) | — | `results/regime_controls.csv` | [`ablations/gpt2_summarization/`](ablations/gpt2_summarization/) |
+| Appendix — full-data and full fine-tuning references | — | `results/regime_controls.csv` | [`outputs/bert/full_data_audit.csv`](outputs/bert/full_data_audit.csv), [`outputs/bert/full_finetune_baseline.csv`](outputs/bert/full_finetune_baseline.csv) |
+| Appendix F.10 — post-pivot learning-rate policy | — | `results/post_pivot_lr.csv` | [`ablations/post_pivot_lr/`](ablations/post_pivot_lr/) |
+| Appendix — pivot timing `K` | — | — | [`outputs/bert/ablation_pivot_epoch.csv`](outputs/bert/ablation_pivot_epoch.csv) |
+| Appendix — optimizer-state ablation | — | — | [`outputs/bert/ablation_optimizer_state.csv`](outputs/bert/ablation_optimizer_state.csv) |
+| Appendix — decoder EVA baseline | `configs/decoder_classification.yaml` | `results/decoder_classification.csv` | [`outputs/decoder/eva_llama2_results.csv`](outputs/decoder/eva_llama2_results.csv), [`outputs/decoder/eva_llama31_results.csv`](outputs/decoder/eva_llama31_results.csv) |
+| Appendix — LoRA-DA (Fisher-gradient variant) | — | not included | not included |
 | Appendix — five-seed confirmation | — | `results/robustness_five_seed.csv` | — |
 | Appendix — initialization overhead and cost | — | `results/compute.csv` | — |
 
@@ -338,9 +356,12 @@ PivotLoRA/
 │   ├── reasoning/                        per-seed CSVs, manifests, pivot
 │   │                                     diagnostics, predictions, logs
 │   ├── bert/                             benchmark, ablations, alignment
-│   ├── decoder/                          Llama-3.1-8B classification
-│   └── summarization/                    GPT-2 ROUGE-L controls
-├── analysis/verify_results.py            137 offline arithmetic checks
+│   ├── decoder/                          Llama classification, EVA runs
+│   └── summarization/superseded_v1/      original GPT-2 runs, not reported
+├── ablations/                            camera-ready ablations (script + per-seed CSV)
+│   ├── post_pivot_lr/                    Appendix F.10
+│   └── gpt2_summarization/               Appendix E.4
+├── analysis/verify_results.py            144 offline arithmetic checks
 └── tests/
     ├── test_pivot.py                     pivot algebra, PCA init, optimizer state
     └── test_answer_parser.py             numeric evaluator and the causal shift
@@ -422,12 +443,17 @@ second.
 | Initial `A` | `√(5/d)·Rᵀ Qᵀ`, fixed random rotation `R` | `√(5/d)·Rᵀ Qᵀ` | **`√(5/d)·Qᵀ`, no rotation** |
 | Seeds | 42, 43, 44 | 42, 43, 44 | 42, 43, 44 |
 
+The 10-step post-pivot ramp in classification is a precaution. Appendix F.10
+shows that the pivot's gain does not depend on it, and leaving the rates
+unchanged after the pivot performs as well
+([`ablations/post_pivot_lr/`](ablations/post_pivot_lr/)).
+
 The reasoning column differs deliberately on the bolded rows: those
 experiments vary initialization, basis scale, and pivot-state handling jointly,
 so they evaluate the complete response-position procedure rather than subspace
 direction alone. In every setting the PCA basis is scaled by `√(5/d)`, which
 gives `A` a Frobenius norm of `√(5r/d)`: about 7× smaller than Kaiming-uniform
-at `d = 768` and 16× smaller at `d = 4096`. It is therefore not norm-matched to
+at `d = 768` and 17× smaller at `d = 4096`. It is therefore not norm-matched to
 vanilla LoRA. In classification, a fixed random `r × r` rotation `R` mixes
 coordinates within the PCA span without changing it.
 

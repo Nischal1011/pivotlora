@@ -390,6 +390,20 @@ def verify_pivot_diagnostics(verbose: bool) -> None:
           all(float(r["orthogonality_error_after"]) < 1e-6 for r in classification))
 
 
+def verify_post_pivot_lr(verbose: bool) -> None:
+    print("\nPost-pivot learning-rate policy (results/post_pivot_lr.csv)")
+    rows = {r["variant"]: r for r in load("post_pivot_lr.csv")}
+    base = float(rows.pop("TT-PCA (no pivot)")["average"])
+    gains = {v: float(r["average"]) - base for v, r in rows.items()}
+    check("every pivot policy improves on TT-PCA by 0.028 to 0.039 on average",
+          close(min(gains.values()), 0.028, 1e-3) and close(max(gains.values()), 0.039, 1e-3),
+          f"[{min(gains.values()):+.3f}, {max(gains.values()):+.3f}]")
+    check("pivot with no rate change improves on TT-PCA by 0.036",
+          close(gains["Pivot, no rate change"], 0.036, 1e-3), f"{gains['Pivot, no rate change']:+.3f}")
+    spread = max(gains.values()) - min(gains.values())
+    check("post-pivot policies differ by at most 0.011", spread <= 0.011 + 1e-9, f"{spread:.3f}")
+
+
 def verify_regime_controls(verbose: bool) -> None:
     print("\nRegime controls (results/regime_controls.csv)")
     rows = load("regime_controls.csv")
@@ -398,10 +412,25 @@ def verify_regime_controls(verbose: bool) -> None:
         (r["task"], r["n"], r["method"]): float(r["mean"])
         for r in rows if r["control"] == "summarization"
     }
-    for task, n, want in [("xsum", "64", -0.003), ("xsum", "256", -0.003),
-                          ("cnndm", "64", -0.017), ("cnndm", "256", -0.016)]:
-        got = summ[(task, n, "PivotLoRA")] - summ[(task, n, "LoRA")]
-        check(f"{task} N={n} ROUGE-L delta = {want:+.3f}", close(got, want, 1e-3), f"{got:+.3f}")
+    cells = [(t, n) for t in ("xsum", "cnndm") for n in ("64", "256")]
+    lora = {c: summ[(*c, "LoRA")] for c in cells}
+
+    def gaps(variant):
+        return [summ[(*c, f"PivotLoRA[{variant}]")] - lora[c] for c in cells]
+
+    for variant, want in [("seqmean/single-LR", 0.002), ("response/single-LR", 0.003)]:
+        got = mean(gaps(variant))
+        check(f"GPT-2 {variant}: mean ROUGE-L gain {want:+.3f} (paper +{want * 100:.1f} points)",
+              close(got, want, 5e-4), f"{got:+.4f}")
+    cls = gaps("seqmean/classification-LR") + gaps("response/classification-LR")
+    check("GPT-2 classification-LR recipe trails LoRA in all 8 cells by 1.5 to 5.1 points",
+          max(cls) < 0 and close(-max(cls), 0.015, 5e-4) and close(-min(cls), 0.051, 5e-4),
+          f"[{min(cls):+.3f}, {max(cls):+.3f}]")
+    resp_better = sum(
+        summ[(*c, f"PivotLoRA[response/{recipe}]")] > summ[(*c, f"PivotLoRA[seqmean/{recipe}]")]
+        for c in cells for recipe in ("single-LR", "classification-LR"))
+    check("GPT-2 response positions beat the sequence mean in all 8 comparisons",
+          resp_better == 8, f"{resp_better}/8")
 
     full = {
         (r["task"], r["method"]): float(r["mean"])
@@ -473,6 +502,7 @@ def main() -> int:
     verify_activation_source(args.verbose)
     verify_pivot_diagnostics(args.verbose)
     verify_regime_controls(args.verbose)
+    verify_post_pivot_lr(args.verbose)
     verify_direction_controls(args.verbose)
 
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")

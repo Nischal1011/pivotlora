@@ -9,7 +9,7 @@ names where it came from:
 - a file path — read directly from that run artifact.
 
 Run `python analysis/verify_results.py` from the repository root to recompute
-every derived statistic from these CSVs — 137 checks, no model or GPU needed.
+every derived statistic from these CSVs — 144 checks, no model or GPU needed.
 Standard deviations are sample standard deviations (ddof = 1), except the
 Llama-3.1-8B EVA and BoolQ rows in `decoder_classification.csv`, which are
 population values (ddof = 0) because their per-seed scores were not retained.
@@ -46,7 +46,7 @@ individual values slightly; `analysis/verify_results.py` handles this.
 `model, task, n, metric, method, mean, std, num_seeds, source`
 
 SST-2 and AG News at N ∈ {64, 256} for both backbones, plus BoolQ for
-Llama-3.1-8B. EVA was evaluated only at N=64.
+Llama-3.1-8B. EVA covers both backbones at N ∈ {64, 256}.
 
 PivotLoRA has the highest mean on all five N=64 settings. At N=256 the
 differences shrink and it is not uniformly best.
@@ -162,14 +162,28 @@ The two families use different optimizer-state policies — classification reset
 
 `control, model, task, n, metric, method, mean, std, num_seeds, source`
 
-- `summarization` — GPT-2 ROUGE-L on XSum and CNN/DailyMail under sequence-mean
-  pooling. PivotLoRA is within 0.003 of LoRA on XSum, 0.016–0.017 lower on
-  CNN/DailyMail.
+- `summarization` — GPT-2 ROUGE-L on XSum and CNN/DailyMail, N ∈ {64, 256}:
+  LoRA and PivotLoRA under a 2×2 of activation source (sequence mean or
+  response positions) and learning-rate recipe (classification eigenvalue-scaled
+  rates or the single reasoning rate). Means are kept to four decimals so the
+  paper's gains recompute exactly. Under the single rate PivotLoRA is +0.2 to
+  +0.3 ROUGE-L points above LoRA; under the classification recipe it trails by
+  1.5 to 5.1 points. Per-seed runs:
+  `ablations/gpt2_summarization/gpt2_response_ablation.csv`.
 - `full_data` — BERT on the full training split, seed 42. Differences span
   −0.009 to +0.022.
 - `full_finetune` — full fine-tuning at N=64 (~110M trainable parameters).
   PivotLoRA matches or exceeds it on all six tasks with ~0.30M adapter
   parameters, roughly 370× fewer.
+
+### `post_pivot_lr.csv` — post-pivot learning-rate policy
+
+`variant, sst2, cola, agnews, average, wins_vs_ttpca_of_15, source`
+
+Appendix F.10. Each task column averages N ∈ {16, ..., 256} over three seeds.
+Every pivot policy improves on TT-PCA by 0.028 to 0.039 on average, including
+leaving the rates unchanged (+0.036). Per-seed runs:
+`ablations/post_pivot_lr/pivot_lr_ablation.csv`.
 
 ### `robustness_five_seed.csv` — five-seed confirmation
 
