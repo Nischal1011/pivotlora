@@ -404,6 +404,17 @@ def verify_post_pivot_lr(verbose: bool) -> None:
     check("post-pivot policies differ by at most 0.011", spread <= 0.011 + 1e-9, f"{spread:.3f}")
 
 
+def verify_lora_da(verbose: bool) -> None:
+    print("\nFisher-gradient (LoRA-DA) baseline (results/lora_da.csv)")
+    m = {(r["task"], r["n"], r["method"]): float(r["mean"]) for r in load("lora_da.csv")}
+    gaps = [m[(t, n, "LoRA")] - m[(t, n, "LoRA-DA")]
+            for t in ("agnews", "sst2") for n in ("16", "32", "64", "128", "256")]
+    check("LoRA-DA below vanilla LoRA in all 10 settings", min(gaps) > 0, f"{sum(g > 0 for g in gaps)}/10")
+    check("LoRA-DA gap spans 0.006 to 0.131",
+          close(min(gaps), 0.006, 5e-4) and close(max(gaps), 0.131, 5e-4),
+          f"[{min(gaps):.3f}, {max(gaps):.3f}]")
+
+
 def verify_regime_controls(verbose: bool) -> None:
     print("\nRegime controls (results/regime_controls.csv)")
     rows = load("regime_controls.csv")
@@ -503,6 +514,7 @@ def main() -> int:
     verify_pivot_diagnostics(args.verbose)
     verify_regime_controls(args.verbose)
     verify_post_pivot_lr(args.verbose)
+    verify_lora_da(args.verbose)
     verify_direction_controls(args.verbose)
 
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")

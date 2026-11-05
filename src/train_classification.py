@@ -92,6 +92,9 @@ METHOD_CONFIGS = {
     # Proves LoRA adapters align with gradient singular subspaces.
     # Stronger theoretical baseline than LoRA-GA.
     "lora_one":     dict(is_peft=False, subspace_type="lora_one",  lr_ratio=1),
+    # Fisher-gradient variant inspired by LoRA-DA (Zhang et al. ICML 2026):
+    # SVD of the mean per-example gradient weighted by sqrt(diagonal Fisher).
+    "lora_da":      dict(is_peft=False, subspace_type="lora_da",   lr_ratio=1),
 }
 
 # ==================== DATA LOADING ====================
@@ -526,6 +529,51 @@ def compute_lora_ga_init(model, layer_module, target_attr, dataset, rank, seed):
     return A_init.cpu(), B_init.cpu()
 
 
+# ==================== FISHER-GRADIENT (LoRA-DA-INSPIRED) INIT ====================
+def compute_lora_da_inits(model, dataset, rank, target_modules=("query", "value")):
+    """Fisher-gradient variant inspired by LoRA-DA.
+
+    For per-example gradients g_i of each adapted weight over the N labeled
+    examples, F_diag = mean_i(g_i * g_i) and G_bar = mean_i(g_i). The init is the
+    rank-r SVD of G_bar * sqrt(F_diag), with A and B assigned as in LoRA-GA.
+    Returns {layer_idx: {target: (A_init, B_init)}}.
+    """
+    weights = {(i, t): getattr(layer.attention.self, t).weight
+               for i, layer in enumerate(model.bert.encoder.layer) for t in target_modules}
+    g_sum = {k: torch.zeros_like(w, dtype=torch.float32) for k, w in weights.items()}
+    f_sum = {k: torch.zeros_like(w, dtype=torch.float32) for k, w in weights.items()}
+    for w in weights.values():
+        w.requires_grad_(True)
+
+    loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+    model.train()
+    n = 0
+    for batch in loader:
+        model.zero_grad(set_to_none=True)
+        inputs = {k: v.to(DEVICE) for k, v in batch.items()
+                  if k not in ("start_positions", "end_positions")}
+        model(**inputs).loss.backward()
+        for k, w in weights.items():
+            g = w.grad.detach().float()
+            g_sum[k] += g
+            f_sum[k] += g * g
+        n += 1
+    model.zero_grad(set_to_none=True)
+    for w in weights.values():
+        w.requires_grad_(False)
+    model.eval()
+
+    inits = defaultdict(dict)
+    for (i, t), w in weights.items():
+        G = (g_sum[(i, t)] / n) * torch.sqrt(f_sum[(i, t)] / n)
+        U, S, Vh = torch.linalg.svd(G, full_matrices=False)
+        A_init = Vh[:rank, :].T
+        B_init = (U[:, :rank] * S[:rank].unsqueeze(0)).T
+        inits[i][t] = (A_init.cpu(), B_init.cpu())
+    print(f"    [LoRA-DA] per-example gradients over N={n} examples")
+    return dict(inits)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # NEW: LoRAM INIT (Zhang et al. NeurIPS 2025)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -675,7 +723,7 @@ def get_block_subspaces(model, dataset, rank, num_classes, seed, subspace_type="
             eigenvalues_dict[idx] = eigs
             print(f"  [PCA-EIGEN] Layer {idx:>2}: eig {eigs.min():.2f}..{eigs.max():.2f} "
                   f"mean={eigs.mean():.2f} max/mean={eigs.max()/eigs.mean():.2f}x")
-        elif subspace_type in ("pissa", "lora_ga", "loram", "lora_one"):
+        elif subspace_type in ("pissa", "lora_ga", "loram", "lora_one", "lora_da"):
             pass  # handled directly in run_experiment
         elif subspace_type == "eva":
             pass  # handled directly in run_experiment
@@ -1266,7 +1314,7 @@ def run_experiment(task, shot, seed, method):
             if subspace_type in ("lda", "pca_lda_complement"):
                 print(f"  [SUBSPACE] QA task: {subspace_type} -> pca_eigen (no class labels)")
                 effective_subspace = "pca_eigen"
-            elif subspace_type in ("lora_ga", "lora_one"):
+            elif subspace_type in ("lora_ga", "lora_one", "lora_da"):
                 print(f"  [SUBSPACE] QA task: {subspace_type} -> none (no scalar loss; using random init)")
                 effective_subspace = "none"
 
@@ -1299,6 +1347,11 @@ def run_experiment(task, shot, seed, method):
             eigenvalues_dict = {}
             print(f"[{effective_subspace.upper()}] Done.")
 
+        elif effective_subspace == "lora_da":
+            b_inits = compute_lora_da_inits(model, train_ds, RANK)
+            block_subspaces  = None
+            eigenvalues_dict = {}
+
         elif effective_subspace == "eva":
             block_subspaces  = compute_eva(model, train_ds, RANK)
             eigenvalues_dict = {}
@@ -1312,10 +1365,10 @@ def run_experiment(task, shot, seed, method):
                 subspace_type=effective_subspace,
             )
 
-        use_structured_init = (effective_subspace not in ("none", "pissa", "lora_ga", "loram", "lora_one", "eva")) or effective_subspace == "eva"
+        use_structured_init = (effective_subspace not in ("none", "pissa", "lora_ga", "loram", "lora_one", "lora_da", "eva")) or effective_subspace == "eva"
         # LoRAM has B=None (zeros) so no residual subtraction needed
         # LoRA-One has non-zero A AND B, so subtract residual (like PiSSA and LoRA-GA)
-        subtract_residual = effective_subspace in ("pissa", "lora_ga", "lora_one")
+        subtract_residual = effective_subspace in ("pissa", "lora_ga", "lora_one", "lora_da")
         model = inject_model(
             model, RANK, block_subspaces,
             use_lda=use_structured_init,

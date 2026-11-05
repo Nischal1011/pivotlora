@@ -9,7 +9,7 @@ names where it came from:
 - a file path — read directly from that run artifact.
 
 Run `python analysis/verify_results.py` from the repository root to recompute
-every derived statistic from these CSVs — 144 checks, no model or GPU needed.
+every derived statistic from these CSVs — 146 checks, no model or GPU needed.
 Standard deviations are sample standard deviations (ddof = 1), except the
 Llama-3.1-8B EVA and BoolQ rows in `decoder_classification.csv`, which are
 population values (ddof = 0) because their per-seed scores were not retained.
@@ -184,6 +184,16 @@ Appendix F.10. Each task column averages N ∈ {16, ..., 256} over three seeds.
 Every pivot policy improves on TT-PCA by 0.028 to 0.039 on average, including
 leaving the rates unchanged (+0.036). Per-seed runs:
 `ablations/post_pivot_lr/pivot_lr_ablation.csv`.
+
+### `lora_da.csv` — Fisher-gradient baseline
+
+`task, n, metric, method, mean, std, num_seeds, source`
+
+Appendix F.4. A Fisher-gradient variant inspired by LoRA-DA (`--methods lora_da`
+in `src/train_classification.py`) and vanilla LoRA, rerun in the same sweep on
+AG News and SST-2 over N ∈ {16, ..., 256} with three seeds. LoRA-DA is below
+LoRA in all 10 settings, by 0.006 to 0.131. Per-seed runs:
+`outputs/bert/lora_da_sweep.csv`.
 
 ### `robustness_five_seed.csv` — five-seed confirmation
 

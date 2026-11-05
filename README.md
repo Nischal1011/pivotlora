@@ -129,7 +129,7 @@ python src/lr_sweep.py --probe                       # sweep grid, no training
 python src/activation_source_ablation.py --probe     # ablation grid, no training
 ```
 
-`analysis/verify_results.py` runs 144 checks covering every headline number.
+`analysis/verify_results.py` runs 146 checks covering every headline number.
 
 ---
 
@@ -149,6 +149,9 @@ python src/train_classification.py --tasks sst2 --shots 64 --seeds 3 \
 
 # Smoke test (short run, one seed).
 python src/train_classification.py --smoke
+
+# Fisher-gradient baseline inspired by LoRA-DA (Appendix F.4), with LoRA rerun.
+python src/train_classification.py --tasks agnews sst2 --seeds 3 --methods lora lora_da
 
 # BoolQ, the auxiliary seventh task used in the alignment analysis.
 python src/train_classification.py --tasks boolq --seeds 3
@@ -303,7 +306,7 @@ python ablations/gpt2_summarization/gpt2_response_ablation.py \
 | Appendix — pivot timing `K` | — | — | [`outputs/bert/ablation_pivot_epoch.csv`](outputs/bert/ablation_pivot_epoch.csv) |
 | Appendix — optimizer-state ablation | — | — | [`outputs/bert/ablation_optimizer_state.csv`](outputs/bert/ablation_optimizer_state.csv) |
 | Appendix — decoder EVA baseline | `configs/decoder_classification.yaml` | `results/decoder_classification.csv` | [`outputs/decoder/eva_llama2_results.csv`](outputs/decoder/eva_llama2_results.csv), [`outputs/decoder/eva_llama31_results.csv`](outputs/decoder/eva_llama31_results.csv) |
-| Appendix — LoRA-DA (Fisher-gradient variant) | — | not included | not included |
+| Appendix F.4 — Fisher-gradient baseline inspired by LoRA-DA | — | `results/lora_da.csv` | [`outputs/bert/lora_da_sweep.csv`](outputs/bert/lora_da_sweep.csv) |
 | Appendix — five-seed confirmation | — | `results/robustness_five_seed.csv` | — |
 | Appendix — initialization overhead and cost | — | `results/compute.csv` | — |
 
@@ -361,7 +364,7 @@ PivotLoRA/
 ├── ablations/                            camera-ready ablations (script + per-seed CSV)
 │   ├── post_pivot_lr/                    Appendix F.10
 │   └── gpt2_summarization/               Appendix E.4
-├── analysis/verify_results.py            144 offline arithmetic checks
+├── analysis/verify_results.py            146 offline arithmetic checks
 └── tests/
     ├── test_pivot.py                     pivot algebra, PCA init, optimizer state
     └── test_answer_parser.py             numeric evaluator and the causal shift
