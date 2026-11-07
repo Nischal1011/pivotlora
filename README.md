@@ -153,6 +153,9 @@ python src/train_classification.py --smoke
 # Fisher-gradient baseline inspired by LoRA-DA (Appendix F.4), with LoRA rerun.
 python src/train_classification.py --tasks agnews sst2 --seeds 3 --methods lora lora_da
 
+# Vanilla LoRA with the PEFT-standard initialization of A (supplementary check).
+python src/train_classification.py --seeds 3 --methods lora_std
+
 # BoolQ, the auxiliary seventh task used in the alignment analysis.
 python src/train_classification.py --tasks boolq --seeds 3
 ```
@@ -273,6 +276,21 @@ python ablations/gpt2_summarization/gpt2_response_ablation.py \
     --variants lora pivot_seqmean pivot_resp pivot_seqmean_unilr pivot_resp_unilr
 ```
 
+### Initialization of vanilla LoRA
+
+In `src/train_classification.py`, `LoRALayer` stores `lora_A` as a d × r
+tensor, so `kaiming_uniform_` takes fan-in = r and the `lora` baseline starts
+with ‖A‖_F ≈ 16 on BERT-base, about 10× the PEFT default (≈ 1.6). The
+`lora_std` method initializes A as PEFT does (Kaiming-uniform on r × d, then
+transposed). Across the 30 BERT settings, PEFT-standard LoRA averages 0.385,
+0.391, 0.438, 0.501, 0.599 for N = 16 to 256, below the reported LoRA in 24 of
+30 settings, and PivotLoRA is above it in 28 of 30 (mean gain +0.092). The
+reported `lora` baseline is the stronger of the two. Summary:
+[`results/lora_std_check.csv`](results/lora_std_check.csv).
+
+To limit memory, set `PIVOT_NUM_WORKERS=0` to load data in the main process
+(the default is 4 workers).
+
 > **Heads up:** `compute_rho.py`, `validate_spiked_covariance.py`,
 > `full_finetune_baseline.py`, and `direction_vs_lr_ablation.py` take no
 > command-line arguments and begin work as soon as they are invoked — passing
@@ -307,6 +325,7 @@ python ablations/gpt2_summarization/gpt2_response_ablation.py \
 | Appendix — optimizer-state ablation | — | — | [`outputs/bert/ablation_optimizer_state.csv`](outputs/bert/ablation_optimizer_state.csv) |
 | Appendix — decoder EVA baseline | `configs/decoder_classification.yaml` | `results/decoder_classification.csv` | [`outputs/decoder/eva_llama2_results.csv`](outputs/decoder/eva_llama2_results.csv), [`outputs/decoder/eva_llama31_results.csv`](outputs/decoder/eva_llama31_results.csv) |
 | Appendix F.4 — Fisher-gradient baseline inspired by LoRA-DA | — | `results/lora_da.csv` | [`outputs/bert/lora_da_sweep.csv`](outputs/bert/lora_da_sweep.csv) |
+| Supplementary — vanilla LoRA with PEFT-standard initialization | — | `results/lora_std_check.csv` | [`outputs/bert/lora_std_check.csv`](outputs/bert/lora_std_check.csv) |
 | Appendix — five-seed confirmation | — | `results/robustness_five_seed.csv` | — |
 | Appendix — initialization overhead and cost | — | `results/compute.csv` | — |
 

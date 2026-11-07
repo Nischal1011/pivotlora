@@ -74,6 +74,9 @@ METHOD_CONFIGS = {
     "adalora":      dict(is_peft=True,  subspace_type="none",      lr_ratio=1,  peft_variant="adalora"),
     "dora":         dict(is_peft=False, subspace_type="none",      lr_ratio=1,  use_dora=True),
     "lora":       dict(is_peft=False, subspace_type="none",      lr_ratio=1),
+    # Vanilla LoRA with the reference PEFT initialization of A: Kaiming-uniform on
+    # an r x d tensor (fan-in = d), transposed into the stored d x r layout.
+    "lora_std":   dict(is_peft=False, subspace_type="none",      lr_ratio=1, std_init=True),
     "lora_plus":    dict(is_peft=False, subspace_type="none",      lr_ratio=16),
     "pissa":        dict(is_peft=False, subspace_type="pissa",     lr_ratio=1,  alpha_override="rank"),
     "lora_ga":      dict(is_peft=False, subspace_type="lora_ga",   lr_ratio=1),
@@ -737,7 +740,7 @@ def get_block_subspaces(model, dataset, rank, num_classes, seed, subspace_type="
 class LoRALayer(nn.Module):
     def __init__(self, original_layer, rank, alpha,
                  init_A=None, init_B=None, track_A_init=False,
-                 b_lr_scales=None, is_dora=False):
+                 b_lr_scales=None, is_dora=False, std_init=False):
         super().__init__()
         self.original_layer = original_layer
         self.rank = rank
@@ -752,6 +755,10 @@ class LoRALayer(nn.Module):
             self.lora_A = nn.Parameter(
                 init_A.to(device=device, dtype=torch.float32) * scale
             )
+        elif std_init:
+            standard_A = torch.empty(rank, d_in, device=device)
+            nn.init.kaiming_uniform_(standard_A, a=np.sqrt(5))
+            self.lora_A = nn.Parameter(standard_A.t().contiguous())
         else:
             self.lora_A = nn.Parameter(torch.empty(d_in, rank, device=device))
             nn.init.kaiming_uniform_(self.lora_A, a=np.sqrt(5))
@@ -1039,7 +1046,7 @@ def inject_model(model, rank, block_subspaces,
                  eigenvalues_dict=None, track_A_init=False,
                  b_inits=None, is_dora=False,
                  effective_alpha=None,
-                 subtract_residual=False):
+                 subtract_residual=False, std_init=False):
     if effective_alpha is None:
         effective_alpha = ALPHA
     print(f"[INJECT] use_lda={use_lda}, rank={rank}")
@@ -1088,7 +1095,8 @@ def inject_model(model, rank, block_subspaces,
                                   init_B=curr_B,
                                   track_A_init=track_A_init,
                                   b_lr_scales=b_scales,
-                                  is_dora=is_dora)
+                                  is_dora=is_dora,
+                                  std_init=std_init)
 
             if subtract_residual and curr_A is not None and curr_B is not None:
                 with torch.no_grad():
@@ -1379,6 +1387,7 @@ def run_experiment(task, shot, seed, method):
             is_dora=cfg.get("use_dora", False),
             effective_alpha=effective_alpha,
             subtract_residual=subtract_residual,
+            std_init=cfg.get("std_init", False),
         )
 
         use_eigen_lr = (eigenvalues_dict is not None and len(eigenvalues_dict) > 0)
@@ -1484,8 +1493,8 @@ def run_experiment(task, shot, seed, method):
         logging_steps=10,
         report_to="none",
         seed=seed,
-        dataloader_num_workers=4,
-        dataloader_persistent_workers=True,
+        dataloader_num_workers=int(os.environ.get("PIVOT_NUM_WORKERS", "4")),
+        dataloader_persistent_workers=int(os.environ.get("PIVOT_NUM_WORKERS", "4")) > 0,
         fp16=True,
         tf32=False,
         disable_tqdm=True,

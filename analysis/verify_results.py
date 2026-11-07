@@ -415,6 +415,18 @@ def verify_lora_da(verbose: bool) -> None:
           f"[{min(gaps):.3f}, {max(gaps):.3f}]")
 
 
+def verify_lora_std(verbose: bool) -> None:
+    print("\nPEFT-standard LoRA initialization (results/lora_std_check.csv)")
+    m = {(r["task"], r["n"], r["method"]): float(r["mean"]) for r in load("lora_std_check.csv")}
+    cells = [(t, n) for t in ("sst2", "cola", "mnli", "qnli", "rte", "agnews")
+             for n in ("16", "32", "64", "128", "256")]
+    std = "LoRA (PEFT-standard init)"
+    pivot_wins = sum(m[(*c, "PivotLoRA")] > m[(*c, std)] for c in cells)
+    lora_wins = sum(m[(*c, "LoRA")] > m[(*c, std)] for c in cells)
+    check("PivotLoRA above PEFT-standard LoRA in 28/30", pivot_wins == 28, f"{pivot_wins}/30")
+    check("reported LoRA above PEFT-standard LoRA in 24/30", lora_wins == 24, f"{lora_wins}/30")
+
+
 def verify_regime_controls(verbose: bool) -> None:
     print("\nRegime controls (results/regime_controls.csv)")
     rows = load("regime_controls.csv")
@@ -515,6 +527,7 @@ def main() -> int:
     verify_regime_controls(args.verbose)
     verify_post_pivot_lr(args.verbose)
     verify_lora_da(args.verbose)
+    verify_lora_std(args.verbose)
     verify_direction_controls(args.verbose)
 
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")

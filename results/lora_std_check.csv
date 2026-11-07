@@ -1,0 +1,91 @@
+task,n,metric,method,mean,std,num_seeds,source
+sst2,16,accuracy,LoRA (PEFT-standard init),0.5279,0.0167,3,outputs/bert/lora_std_check.csv
+sst2,16,accuracy,LoRA,0.524,0.011,3,results/bert_main.csv
+sst2,16,accuracy,PivotLoRA,0.543,0.038,3,results/bert_main.csv
+sst2,32,accuracy,LoRA (PEFT-standard init),0.5088,0.0178,3,outputs/bert/lora_std_check.csv
+sst2,32,accuracy,LoRA,0.546,0.037,3,results/bert_main.csv
+sst2,32,accuracy,PivotLoRA,0.633,0.018,3,results/bert_main.csv
+sst2,64,accuracy,LoRA (PEFT-standard init),0.5841,0.0241,3,outputs/bert/lora_std_check.csv
+sst2,64,accuracy,LoRA,0.652,0.014,3,results/bert_main.csv
+sst2,64,accuracy,PivotLoRA,0.795,0.016,3,results/bert_main.csv
+sst2,128,accuracy,LoRA (PEFT-standard init),0.6563,0.0967,3,outputs/bert/lora_std_check.csv
+sst2,128,accuracy,LoRA,0.772,0.006,3,results/bert_main.csv
+sst2,128,accuracy,PivotLoRA,0.823,0.017,3,results/bert_main.csv
+sst2,256,accuracy,LoRA (PEFT-standard init),0.8452,0.0064,3,outputs/bert/lora_std_check.csv
+sst2,256,accuracy,LoRA,0.844,0.012,3,results/bert_main.csv
+sst2,256,accuracy,PivotLoRA,0.850,0.010,3,results/bert_main.csv
+cola,16,matthews_correlation,LoRA (PEFT-standard init),0.0890,0.0791,3,outputs/bert/lora_std_check.csv
+cola,16,matthews_correlation,LoRA,0.081,0.056,3,results/bert_main.csv
+cola,16,matthews_correlation,PivotLoRA,0.124,0.015,3,results/bert_main.csv
+cola,32,matthews_correlation,LoRA (PEFT-standard init),0.0919,0.0659,3,outputs/bert/lora_std_check.csv
+cola,32,matthews_correlation,LoRA,0.131,0.047,3,results/bert_main.csv
+cola,32,matthews_correlation,PivotLoRA,0.171,0.049,3,results/bert_main.csv
+cola,64,matthews_correlation,LoRA (PEFT-standard init),0.1248,0.0847,3,outputs/bert/lora_std_check.csv
+cola,64,matthews_correlation,LoRA,0.163,0.046,3,results/bert_main.csv
+cola,64,matthews_correlation,PivotLoRA,0.288,0.098,3,results/bert_main.csv
+cola,128,matthews_correlation,LoRA (PEFT-standard init),0.2143,0.0744,3,outputs/bert/lora_std_check.csv
+cola,128,matthews_correlation,LoRA,0.264,0.072,3,results/bert_main.csv
+cola,128,matthews_correlation,PivotLoRA,0.365,0.071,3,results/bert_main.csv
+cola,256,matthews_correlation,LoRA (PEFT-standard init),0.3870,0.0354,3,outputs/bert/lora_std_check.csv
+cola,256,matthews_correlation,LoRA,0.407,0.010,3,results/bert_main.csv
+cola,256,matthews_correlation,PivotLoRA,0.411,0.025,3,results/bert_main.csv
+mnli,16,accuracy,LoRA (PEFT-standard init),0.3481,0.0008,3,outputs/bert/lora_std_check.csv
+mnli,16,accuracy,LoRA,0.350,0.008,3,results/bert_main.csv
+mnli,16,accuracy,PivotLoRA,0.356,0.010,3,results/bert_main.csv
+mnli,32,accuracy,LoRA (PEFT-standard init),0.3538,0.0025,3,outputs/bert/lora_std_check.csv
+mnli,32,accuracy,LoRA,0.356,0.006,3,results/bert_main.csv
+mnli,32,accuracy,PivotLoRA,0.362,0.008,3,results/bert_main.csv
+mnli,64,accuracy,LoRA (PEFT-standard init),0.3484,0.0167,3,outputs/bert/lora_std_check.csv
+mnli,64,accuracy,LoRA,0.366,0.003,3,results/bert_main.csv
+mnli,64,accuracy,PivotLoRA,0.367,0.005,3,results/bert_main.csv
+mnli,128,accuracy,LoRA (PEFT-standard init),0.3616,0.0066,3,outputs/bert/lora_std_check.csv
+mnli,128,accuracy,LoRA,0.356,0.008,3,results/bert_main.csv
+mnli,128,accuracy,PivotLoRA,0.389,0.009,3,results/bert_main.csv
+mnli,256,accuracy,LoRA (PEFT-standard init),0.3903,0.0272,3,outputs/bert/lora_std_check.csv
+mnli,256,accuracy,LoRA,0.392,0.011,3,results/bert_main.csv
+mnli,256,accuracy,PivotLoRA,0.454,0.041,3,results/bert_main.csv
+qnli,16,accuracy,LoRA (PEFT-standard init),0.5054,0.0392,3,outputs/bert/lora_std_check.csv
+qnli,16,accuracy,LoRA,0.519,0.037,3,results/bert_main.csv
+qnli,16,accuracy,PivotLoRA,0.533,0.026,3,results/bert_main.csv
+qnli,32,accuracy,LoRA (PEFT-standard init),0.5144,0.0443,3,outputs/bert/lora_std_check.csv
+qnli,32,accuracy,LoRA,0.521,0.040,3,results/bert_main.csv
+qnli,32,accuracy,PivotLoRA,0.547,0.036,3,results/bert_main.csv
+qnli,64,accuracy,LoRA (PEFT-standard init),0.5232,0.0301,3,outputs/bert/lora_std_check.csv
+qnli,64,accuracy,LoRA,0.555,0.042,3,results/bert_main.csv
+qnli,64,accuracy,PivotLoRA,0.594,0.049,3,results/bert_main.csv
+qnli,128,accuracy,LoRA (PEFT-standard init),0.5646,0.0514,3,outputs/bert/lora_std_check.csv
+qnli,128,accuracy,LoRA,0.626,0.061,3,results/bert_main.csv
+qnli,128,accuracy,PivotLoRA,0.645,0.050,3,results/bert_main.csv
+qnli,256,accuracy,LoRA (PEFT-standard init),0.6323,0.0674,3,outputs/bert/lora_std_check.csv
+qnli,256,accuracy,LoRA,0.662,0.040,3,results/bert_main.csv
+qnli,256,accuracy,PivotLoRA,0.691,0.013,3,results/bert_main.csv
+rte,16,accuracy,LoRA (PEFT-standard init),0.5247,0.0418,3,outputs/bert/lora_std_check.csv
+rte,16,accuracy,LoRA,0.508,0.040,3,results/bert_main.csv
+rte,16,accuracy,PivotLoRA,0.551,0.019,3,results/bert_main.csv
+rte,32,accuracy,LoRA (PEFT-standard init),0.5283,0.0185,3,outputs/bert/lora_std_check.csv
+rte,32,accuracy,LoRA,0.549,0.036,3,results/bert_main.csv
+rte,32,accuracy,PivotLoRA,0.584,0.017,3,results/bert_main.csv
+rte,64,accuracy,LoRA (PEFT-standard init),0.5692,0.0185,3,outputs/bert/lora_std_check.csv
+rte,64,accuracy,LoRA,0.551,0.022,3,results/bert_main.csv
+rte,64,accuracy,PivotLoRA,0.569,0.025,3,results/bert_main.csv
+rte,128,accuracy,LoRA (PEFT-standard init),0.5548,0.0127,3,outputs/bert/lora_std_check.csv
+rte,128,accuracy,LoRA,0.569,0.015,3,results/bert_main.csv
+rte,128,accuracy,PivotLoRA,0.549,0.010,3,results/bert_main.csv
+rte,256,accuracy,LoRA (PEFT-standard init),0.5307,0.0096,3,outputs/bert/lora_std_check.csv
+rte,256,accuracy,LoRA,0.549,0.003,3,results/bert_main.csv
+rte,256,accuracy,PivotLoRA,0.563,0.012,3,results/bert_main.csv
+agnews,16,accuracy,LoRA (PEFT-standard init),0.3160,0.0326,3,outputs/bert/lora_std_check.csv
+agnews,16,accuracy,LoRA,0.431,0.016,3,results/bert_main.csv
+agnews,16,accuracy,PivotLoRA,0.600,0.049,3,results/bert_main.csv
+agnews,32,accuracy,LoRA (PEFT-standard init),0.3486,0.0134,3,outputs/bert/lora_std_check.csv
+agnews,32,accuracy,LoRA,0.466,0.050,3,results/bert_main.csv
+agnews,32,accuracy,PivotLoRA,0.705,0.047,3,results/bert_main.csv
+agnews,64,accuracy,LoRA (PEFT-standard init),0.4794,0.0485,3,outputs/bert/lora_std_check.csv
+agnews,64,accuracy,LoRA,0.640,0.033,3,results/bert_main.csv
+agnews,64,accuracy,PivotLoRA,0.834,0.018,3,results/bert_main.csv
+agnews,128,accuracy,LoRA (PEFT-standard init),0.6560,0.0727,3,outputs/bert/lora_std_check.csv
+agnews,128,accuracy,LoRA,0.807,0.006,3,results/bert_main.csv
+agnews,128,accuracy,PivotLoRA,0.866,0.004,3,results/bert_main.csv
+agnews,256,accuracy,LoRA (PEFT-standard init),0.8088,0.0228,3,outputs/bert/lora_std_check.csv
+agnews,256,accuracy,LoRA,0.855,0.006,3,results/bert_main.csv
+agnews,256,accuracy,PivotLoRA,0.878,0.001,3,results/bert_main.csv

@@ -195,6 +195,18 @@ AG News and SST-2 over N ∈ {16, ..., 256} with three seeds. LoRA-DA is below
 LoRA in all 10 settings, by 0.006 to 0.131. Per-seed runs:
 `outputs/bert/lora_da_sweep.csv`.
 
+### `lora_std_check.csv` — PEFT-standard LoRA initialization
+
+`task, n, metric, method, mean, std, num_seeds, source`
+
+Supplementary check, not in the paper. Vanilla LoRA with A initialized as in
+PEFT (`--methods lora_std`), on the six primary tasks over N ∈ {16, ..., 256}
+with three seeds, next to the reported LoRA and PivotLoRA from `bert_main.csv`.
+PEFT-standard LoRA is below the reported LoRA in 24 of 30 settings, and
+PivotLoRA is above it in 28 of 30. Per-seed runs:
+`outputs/bert/lora_std_check.csv`, which also holds same-job reruns of `lora`
+and `pivotlora` at N = 64.
+
 ### `robustness_five_seed.csv` — five-seed confirmation
 
 `task, n, method, mean, std, num_seeds, mean_gain_vs_lora, bootstrap_ci_low, bootstrap_ci_high, source`
