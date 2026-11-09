@@ -156,6 +156,11 @@ python src/train_classification.py --tasks agnews sst2 --seeds 3 --methods lora 
 # Vanilla LoRA with the PEFT-standard initialization of A (supplementary check).
 python src/train_classification.py --seeds 3 --methods lora_std
 
+# LoRAM, LoRA-GA, LoRA-One and SRLoRA as published (supplementary check), and
+# LoRA-GA as published at the shared scale.
+python src/train_classification.py --seeds 3 --methods loram_paper lora_ga_paper \
+    lora_one_paper srlora_paper lora_ga_paper_shared
+
 # BoolQ, the auxiliary seventh task used in the alignment analysis.
 python src/train_classification.py --tasks boolq --seeds 3
 ```
@@ -287,6 +292,17 @@ transposed). Across the 30 BERT settings, PEFT-standard LoRA averages 0.385,
 30 settings, and PivotLoRA is above it in 28 of 30 (mean gain +0.092). The
 reported `lora` baseline is the stronger of the two. Summary:
 [`results/lora_std_check.csv`](results/lora_std_check.csv).
+
+### Baselines as published
+
+The paper runs every supplied initialization at PivotLoRA's √(5/d) scale
+(Appendix C). As a supplementary check, the `*_paper` methods run LoRAM,
+LoRA-GA, LoRA-One and SRLoRA as their papers and official code specify, each at
+its own scale. PivotLoRA has the highest mean at every N against all four and
+is above them in 111 of 120 settings. LoRA-GA as published is the strongest; run
+at the shared scale (`lora_ga_paper_shared`) it falls to within 0.009 of the
+paper's version, so its extra strength is the larger initial A. Summary:
+[`results/faithful_baselines.csv`](results/faithful_baselines.csv).
 
 To limit memory, set `PIVOT_NUM_WORKERS=0` to load data in the main process
 (the default is 4 workers).

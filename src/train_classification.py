@@ -80,16 +80,38 @@ METHOD_CONFIGS = {
     "lora_plus":    dict(is_peft=False, subspace_type="none",      lr_ratio=16),
     "pissa":        dict(is_peft=False, subspace_type="pissa",     lr_ratio=1,  alpha_override="rank"),
     "lora_ga":      dict(is_peft=False, subspace_type="lora_ga",   lr_ratio=1),
+    # LoRA-GA as released (Wang et al. 2024; github.com/Outsider565/LoRA-GA, reproduce/conf):
+    # gradient averaged over 8 examples; A = c V[:, :r]^T, B = c U[:, r:2r], c = d_out^(1/4)/sqrt(gamma),
+    # gamma = 16; PEFT scale alpha/r (alpha = 16, use_rslora false); W <- W - (alpha/r) B A.
+    "lora_ga_paper": dict(is_peft=False, subspace_type="lora_ga_paper", lr_ratio=1, raw_init=True),
+    # Magnitude test: faithful LoRA-GA with the shared sqrt(5/d) scale on A (everything else as released).
+    "lora_ga_paper_shared": dict(is_peft=False, subspace_type="lora_ga_paper", lr_ratio=1),
+    # LoRA-One as released (Zhang et al. 2025; github.com/YuanheZ/LoRA-One, conf/init/gradient.yaml):
+    # G = -grad over 8 examples; B = U_r sqrt(S_r)/sqrt(S_1)/sqrt(gamma), A = sqrt(S_r) V_r^T/sqrt(S_1)/sqrt(gamma),
+    # gamma = 128; rsLoRA scale alpha/sqrt(r) (alpha = 16); W is NOT modified at initialization.
+    "lora_one_paper": dict(is_peft=False, subspace_type="lora_one_paper", lr_ratio=1,
+                           alpha_override=16.0 * np.sqrt(8), raw_init=True),
     "lda_lora":  dict(is_peft=False, subspace_type="lda",       lr_ratio=16),
     "eigenlora":       dict(is_peft=False, subspace_type="pca_eigen", lr_ratio=16),
     "pivotlora":   dict(is_peft=False, subspace_type="pca_eigen", lr_ratio=16, use_pivot=True),
     "eva":          dict(is_peft=False, subspace_type="eva",        lr_ratio=1),
     "srlora":       dict(is_peft=False, subspace_type="none",       lr_ratio=1,  sr_lora=True),
+    # SRLoRA as published (Yang, Wang, Hossain 2025, Algorithm 1, GLUE setup): PiSSA init with
+    # sqrt(S) on both factors, scale alpha/r = 1; AdaLoRA-style importance (beta1 = beta2 = 0.85);
+    # fuse the lowest gamma = 0.5 of components, refill from the next unused SVD directions of the
+    # ORIGINAL W0 and subtract; t_interval = N_all / ((r_target - r) / r').
+    "srlora_paper": dict(is_peft=False, subspace_type="pissa_paper", lr_ratio=1,
+                         alpha_override="rank", raw_init=True, sr_lora_paper=True),
     # ── NEW: LoRAM (Zhang et al. NeurIPS 2025) ──
     # Magnitude-driven init: deterministic orthogonal basis scaled by log(1 + sigma_max(W)).
     # Claims spectral init gains come from magnitude amplification, not subspace quality.
     # Uniform LR (lr_ratio=1). No full SVD needed — just top singular value via power iteration.
     "loram":        dict(is_peft=False, subspace_type="loram",     lr_ratio=1),
+    # LoRAM exactly as published (Zhang et al. 2025, Algorithm 1 / Eq. 11-12):
+    # DST basis on both factors, beta = (log_{min(n,m)}(r) * nu[W] / nu[Phi_n Phi_m^T])^(1/4),
+    # W <- W - beta^2 Phi_n Phi_m^T, adapter scale 1 (alpha = r), no shared sqrt(5/d) rescaling.
+    "loram_paper":  dict(is_peft=False, subspace_type="loram_paper", lr_ratio=1,
+                         alpha_override="rank", raw_init=True),
     # ── NEW: LoRA-One (Zhang et al. ICML 2025 Oral) ──
     # One-step full gradient SVD init. Both A and B get singular value scaling.
     # Proves LoRA adapters align with gradient singular subspaces.
@@ -532,6 +554,62 @@ def compute_lora_ga_init(model, layer_module, target_attr, dataset, rank, seed):
     return A_init.cpu(), B_init.cpu()
 
 
+def _full_weight_grad(model, W, dataset, grad_batch=8):
+    """Gradient of the mean loss over the first `grad_batch` (seed-shuffled) training examples."""
+    W.requires_grad_(True)
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=min(grad_batch, len(dataset)), shuffle=False)
+    batch = next(iter(loader))
+    model.train()
+    model.zero_grad(set_to_none=True)
+    inputs = {k: v.to(DEVICE) for k, v in batch.items()
+              if k not in ("start_positions", "end_positions")}
+    model(**inputs).loss.backward()
+    G = W.grad.detach().double()
+    W.requires_grad_(False)
+    model.zero_grad(set_to_none=True)
+    model.eval()
+    return G
+
+
+def compute_lora_one_paper_init(model, layer_module, target_attr, dataset, rank, seed,
+                                grad_batch=8, gamma=128.0):
+    """LoRA-One as released (Zhang, Liu, Chen, ICML 2025; official run_exp.py)."""
+    W = getattr(layer_module, target_attr).weight
+    G = -_full_weight_grad(model, W, dataset, grad_batch)
+    U, S, Vh = torch.linalg.svd(G, full_matrices=False)
+    root = torch.sqrt(S[:rank]) / torch.sqrt(S[0]) / np.sqrt(gamma)
+    B_theirs = U[:, :rank] * root.unsqueeze(0)          # (d_out, r)
+    A_theirs = root.unsqueeze(1) * Vh[:rank, :]         # (r, d_in)
+    return A_theirs.T.float().cpu(), B_theirs.T.float().cpu()
+
+
+def compute_lora_ga_paper_init(model, layer_module, target_attr, dataset, rank, seed,
+                               grad_batch=8, gamma=16.0):
+    """LoRA-GA as released (Wang, Yu, Li, NeurIPS 2024; official reproduce/run_exp.py)."""
+    original = getattr(layer_module, target_attr)
+    W = original.weight
+    W.requires_grad_(True)
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=min(grad_batch, len(dataset)), shuffle=False)
+    batch = next(iter(loader))
+    model.train()
+    model.zero_grad(set_to_none=True)
+    inputs = {k: v.to(DEVICE) for k, v in batch.items()
+              if k not in ("start_positions", "end_positions")}
+    model(**inputs).loss.backward()
+    G = W.grad.detach().double()
+    W.requires_grad_(False)
+    model.zero_grad(set_to_none=True)
+    model.eval()
+    d_out = G.shape[0]
+    U, S, Vh = torch.linalg.svd(G, full_matrices=False)
+    c = d_out ** 0.25 / np.sqrt(gamma)
+    A_init = (c * Vh[:rank, :].T).float()            # (d_in, r): top-r right singular vectors
+    B_init = (c * U[:, rank:2 * rank].T).float()     # (r, d_out): left singular vectors r+1..2r
+    return A_init.cpu(), B_init.cpu()
+
+
 # ==================== FISHER-GRADIENT (LoRA-DA-INSPIRED) INIT ====================
 def compute_lora_da_inits(model, dataset, rank, target_modules=("query", "value")):
     """Fisher-gradient variant inspired by LoRA-DA.
@@ -616,6 +694,35 @@ def compute_loram_init(weight, rank):
 
     print(f"    [LoRAM] sigma_max={sigma_max:.2f} -> magnitude={magnitude:.4f}")
     return A_init, None  # B=None -> zeros in LoRALayer
+
+
+def _dst_basis(n, rank):
+    """First `rank` columns of the n x n DST-I basis: sqrt(2/(n+1)) sin((i+1)(j+1)pi/(n+1))."""
+    i = np.arange(n)[:, None]
+    j = np.arange(rank)[None, :]
+    return np.sqrt(2.0 / (n + 1)) * np.sin((i + 1) * (j + 1) * np.pi / (n + 1))
+
+
+def compute_loram_paper_init(weight, rank):
+    """
+    LoRAM as published (Zhang et al., "The Primacy of Magnitude in Low-Rank
+    Adaptation", NeurIPS 2025, Algorithm 1). W is n x m (out x in).
+    Returns A in the harness layout (d_in x rank) and B (rank x d_out) so that
+    the harness product (A @ B).T equals beta^2 Phi_n Phi_m^T.
+    """
+    W = weight.detach().double().cpu().numpy()
+    n, m = W.shape
+    phi_n = _dst_basis(n, rank)
+    phi_m = _dst_basis(m, rank)
+    nu_W = (W ** 2).mean()
+    P = phi_n @ phi_m.T
+    nu_P = (P ** 2).mean()
+    q_r = np.log(rank) / np.log(min(n, m))
+    beta = (q_r * nu_W / nu_P) ** 0.25
+    A_init = torch.tensor(beta * phi_m, dtype=torch.float32)      # (m, r)
+    B_init = torch.tensor(beta * phi_n.T, dtype=torch.float32)    # (r, n)
+    print(f"    [LoRAM-paper] beta={beta:.4f} nu[W]={nu_W:.3e} Q[r]={q_r:.4f}")
+    return A_init, B_init
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -740,7 +847,7 @@ def get_block_subspaces(model, dataset, rank, num_classes, seed, subspace_type="
 class LoRALayer(nn.Module):
     def __init__(self, original_layer, rank, alpha,
                  init_A=None, init_B=None, track_A_init=False,
-                 b_lr_scales=None, is_dora=False, std_init=False):
+                 b_lr_scales=None, is_dora=False, std_init=False, raw_init=False):
         super().__init__()
         self.original_layer = original_layer
         self.rank = rank
@@ -751,7 +858,7 @@ class LoRALayer(nn.Module):
         device = original_layer.weight.device
 
         if init_A is not None:
-            scale = np.sqrt(5.0) / np.sqrt(d_in)
+            scale = 1.0 if raw_init else np.sqrt(5.0) / np.sqrt(d_in)
             self.lora_A = nn.Parameter(
                 init_A.to(device=device, dtype=torch.float32) * scale
             )
@@ -1040,13 +1147,108 @@ class SRLoRACallback(TrainerCallback):
         print(f"[SRLoRA] Recomposed {recomp_count} layers (fused {n_fuse}/{rank} pairs each).")
 
 
+SRLORA_PAPER_R_TARGET = {"sst2": 512, "cola": 256, "qnli": 128, "rte": 16, "mrpc": 256, "stsb": 32}
+SRLORA_PAPER_R_TARGET_DEFAULT = 128   # MNLI, AG News, BoolQ: not listed in the SRLoRA paper
+
+
+def compute_pissa_paper_init(weight, rank):
+    """PiSSA with sqrt(S) on both factors (B = U_r S_r^1/2, A = S_r^1/2 V_r^T)."""
+    U, S, Vh = torch.linalg.svd(weight.detach().double(), full_matrices=False)
+    root = torch.sqrt(S[:rank])
+    A = (root.unsqueeze(1) * Vh[:rank, :]).T     # (d_in, r)
+    B = (U[:, :rank] * root.unsqueeze(0)).T      # (r, d_out)
+    return A.float().cpu(), B.float().cpu()
+
+
+class SRLoRAPaperCallback(TrainerCallback):
+    """SRLoRA (arXiv 2505.12433) Algorithm 1 inside this harness."""
+
+    def __init__(self, total_steps, rank, r_target, gamma=0.5, beta1=0.85, beta2=0.85):
+        self.r_prime = max(1, int(round(gamma * rank)))
+        self.n_switch = max(1, (r_target - rank) // self.r_prime)
+        self.interval = max(1, int(round(total_steps / self.n_switch)))
+        self.beta1, self.beta2 = beta1, beta2
+        self.step = 0
+        self.switches = 0
+        self.svd = {}
+        self.next_idx = {}
+        self.ibar = {}
+        self.ubar = {}
+        print(f"  [SRLoRA-paper] r'={self.r_prime} N_switch={self.n_switch} "
+              f"t_interval={self.interval} (total steps {total_steps}, r_target {r_target})")
+
+    def _layers(self, model):
+        return [(n, m) for n, m in model.named_modules() if isinstance(m, LoRALayer)]
+
+    def on_train_begin(self, args, state, control, model=None, **kwargs):
+        with torch.no_grad():
+            for name, m in self._layers(model):
+                A, B = m.lora_A.data, m.lora_B_matrix
+                W0 = m.original_layer.weight.data.double() + ((A @ B).T * m.scaling).double()
+                U, S, Vh = torch.linalg.svd(W0, full_matrices=False)
+                self.svd[name] = (U.float(), S.float(), Vh.float())
+                self.next_idx[name] = m.rank
+
+    def on_pre_optimizer_step(self, args, state, control, model=None, **kwargs):
+        with torch.no_grad():
+            for name, m in self._layers(model):
+                for key, p in (("A", m.lora_A), ("B", m.lora_B)):
+                    if p is None or p.grad is None:
+                        continue
+                    sens = (p.data * p.grad).abs()
+                    k = (name, key)
+                    if k not in self.ibar:
+                        self.ibar[k] = torch.zeros_like(sens)
+                        self.ubar[k] = torch.zeros_like(sens)
+                    self.ibar[k].mul_(self.beta1).add_((1 - self.beta1) * sens)
+                    self.ubar[k].mul_(self.beta2).add_((1 - self.beta2) * (sens - self.ibar[k]).abs())
+
+    def on_step_end(self, args, state, control, model=None, optimizer=None, **kwargs):
+        self.step += 1
+        if self.step % self.interval != 0 or self.switches >= self.n_switch:
+            return
+        self.switches += 1
+        with torch.no_grad():
+            for name, m in self._layers(model):
+                if (name, "A") not in self.ibar:
+                    continue
+                sA = self.ibar[(name, "A")] * self.ubar[(name, "A")]     # (d_in, r)
+                sB = self.ibar[(name, "B")] * self.ubar[(name, "B")]     # (r, d_out)
+                score = sA.mean(dim=0) + sB.mean(dim=1)
+                low = score.argsort()[:self.r_prime].tolist()
+                A, B = m.lora_A.data, m.lora_B.data
+                W = m.original_layer.weight.data
+                U, S, Vh = self.svd[name]
+                for ri in low:
+                    W.add_((A[:, ri:ri + 1] @ B[ri:ri + 1, :]).T * m.scaling)
+                    j = self.next_idx[name] % S.numel()
+                    self.next_idx[name] += 1
+                    root = torch.sqrt(S[j])
+                    A[:, ri] = root * Vh[j, :]
+                    B[ri, :] = root * U[:, j]
+                    W.sub_((A[:, ri:ri + 1] @ B[ri:ri + 1, :]).T * m.scaling)
+                if optimizer is not None:
+                    for p, axis in ((m.lora_A, 1), (m.lora_B, 0)):
+                        st = optimizer.state.get(p, {})
+                        for buf in ("exp_avg", "exp_avg_sq"):
+                            if buf in st:
+                                if axis == 1:
+                                    st[buf][:, low] = 0.0
+                                else:
+                                    st[buf][low, :] = 0.0
+                for key in ("A", "B"):
+                    self.ibar[(name, key)].zero_()
+                    self.ubar[(name, key)].zero_()
+        print(f"[SRLoRA-paper] switch {self.switches}/{self.n_switch} at step {self.step}")
+
+
 # ==================== INJECTOR ====================
 def inject_model(model, rank, block_subspaces,
                  use_lda=False, apply_rotation=True,
                  eigenvalues_dict=None, track_A_init=False,
                  b_inits=None, is_dora=False,
                  effective_alpha=None,
-                 subtract_residual=False, std_init=False):
+                 subtract_residual=False, std_init=False, raw_init=False):
     if effective_alpha is None:
         effective_alpha = ALPHA
     print(f"[INJECT] use_lda={use_lda}, rank={rank}")
@@ -1096,7 +1298,8 @@ def inject_model(model, rank, block_subspaces,
                                   track_A_init=track_A_init,
                                   b_lr_scales=b_scales,
                                   is_dora=is_dora,
-                                  std_init=std_init)
+                                  std_init=std_init,
+                                  raw_init=raw_init)
 
             if subtract_residual and curr_A is not None and curr_B is not None:
                 with torch.no_grad():
@@ -1322,16 +1525,21 @@ def run_experiment(task, shot, seed, method):
             if subspace_type in ("lda", "pca_lda_complement"):
                 print(f"  [SUBSPACE] QA task: {subspace_type} -> pca_eigen (no class labels)")
                 effective_subspace = "pca_eigen"
-            elif subspace_type in ("lora_ga", "lora_one", "lora_da"):
+            elif subspace_type in ("lora_ga", "lora_ga_paper", "lora_one", "lora_one_paper", "lora_da"):
                 print(f"  [SUBSPACE] QA task: {subspace_type} -> none (no scalar loss; using random init)")
                 effective_subspace = "none"
 
         alpha_override = cfg.get("alpha_override", None)
-        effective_alpha = RANK if alpha_override == "rank" else ALPHA
+        if alpha_override == "rank":
+            effective_alpha = RANK
+        elif isinstance(alpha_override, (int, float)):
+            effective_alpha = float(alpha_override)
+        else:
+            effective_alpha = ALPHA
 
         # ── PiSSA / LoRA-GA / LoRAM / LoRA-One: compute per-layer init pairs ──
         b_inits = None
-        if effective_subspace in ("pissa", "lora_ga", "loram", "lora_one"):
+        if effective_subspace in ("pissa", "pissa_paper", "lora_ga", "lora_ga_paper", "lora_one_paper", "loram", "loram_paper", "lora_one"):
             target_modules = ["query", "value"]
             b_inits = {}
             print(f"[{effective_subspace.upper()}] Computing weight/gradient inits...")
@@ -1341,8 +1549,18 @@ def run_experiment(task, shot, seed, method):
                     original = getattr(layer_module.attention.self, target)
                     if effective_subspace == "pissa":
                         A_i, B_i = compute_pissa_init(original.weight, RANK)
+                    elif effective_subspace == "pissa_paper":
+                        A_i, B_i = compute_pissa_paper_init(original.weight, RANK)
                     elif effective_subspace == "loram":
                         A_i, B_i = compute_loram_init(original.weight, RANK)
+                    elif effective_subspace == "lora_ga_paper":
+                        A_i, B_i = compute_lora_ga_paper_init(
+                            model, layer_module.attention.self, target, train_ds, RANK, seed)
+                    elif effective_subspace == "lora_one_paper":
+                        A_i, B_i = compute_lora_one_paper_init(
+                            model, layer_module.attention.self, target, train_ds, RANK, seed)
+                    elif effective_subspace == "loram_paper":
+                        A_i, B_i = compute_loram_paper_init(original.weight, RANK)
                     elif effective_subspace == "lora_one":
                         A_i, B_i = compute_lora_one_init(
                             model, layer_module.attention.self, target, train_ds, RANK, seed,
@@ -1373,10 +1591,10 @@ def run_experiment(task, shot, seed, method):
                 subspace_type=effective_subspace,
             )
 
-        use_structured_init = (effective_subspace not in ("none", "pissa", "lora_ga", "loram", "lora_one", "lora_da", "eva")) or effective_subspace == "eva"
+        use_structured_init = (effective_subspace not in ("none", "pissa", "pissa_paper", "lora_ga", "lora_ga_paper", "lora_one_paper", "loram", "loram_paper", "lora_one", "lora_da", "eva")) or effective_subspace == "eva"
         # LoRAM has B=None (zeros) so no residual subtraction needed
         # LoRA-One has non-zero A AND B, so subtract residual (like PiSSA and LoRA-GA)
-        subtract_residual = effective_subspace in ("pissa", "lora_ga", "lora_one", "lora_da")
+        subtract_residual = effective_subspace in ("pissa", "lora_ga", "lora_one", "lora_da", "loram_paper", "lora_ga_paper", "pissa_paper")
         model = inject_model(
             model, RANK, block_subspaces,
             use_lda=use_structured_init,
@@ -1388,6 +1606,7 @@ def run_experiment(task, shot, seed, method):
             effective_alpha=effective_alpha,
             subtract_residual=subtract_residual,
             std_init=cfg.get("std_init", False),
+            raw_init=cfg.get("raw_init", False),
         )
 
         use_eigen_lr = (eigenvalues_dict is not None and len(eigenvalues_dict) > 0)
@@ -1473,6 +1692,10 @@ def run_experiment(task, shot, seed, method):
             cbs.append(lp_cb)
             print(f"  [LoRA+] Cosine decay over {total_steps_lp} steps")
 
+        if cfg.get("sr_lora_paper", False):
+            total_steps = (len(train_ds) // actual_batch + int(len(train_ds) % actual_batch > 0)) * actual_epochs
+            r_target = SRLORA_PAPER_R_TARGET.get(task, SRLORA_PAPER_R_TARGET_DEFAULT)
+            cbs.append(SRLoRAPaperCallback(total_steps, RANK, r_target))
         if cfg.get("sr_lora", False):
             num_samples    = len(train_ds)
             steps_per_epoch = max(1, (num_samples + actual_batch - 1) // actual_batch)

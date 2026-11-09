@@ -27,6 +27,7 @@ are replaced with `<workdir>`.
 |---|---|
 | `main_bert_results.csv` | per-seed scores, 6 tasks × 5 N × 3 seeds × 13 methods |
 | `lora_std_check.csv` | per-seed vanilla LoRA with PEFT-standard init (`lora_std`), 6 tasks × 5 N × 3 seeds, plus `lora` and `pivotlora` rerun in the same job at N = 64 |
+| `faithful_baselines.csv` | per-seed LoRAM, LoRA-GA, LoRA-One and SRLoRA as published, plus LoRA-GA as published at the shared scale (`lora_ga_paper_shared`), 6 tasks × 5 N × 3 seeds each |
 | `ablation_pivot_epoch.csv` | pivot timing K |
 | `boolq_check.csv` | BoolQ rerun of LoRA, TT-PCA (`eigenlora`), and PivotLoRA at N=16 and 64 with the released script |
 | `ablation_optimizer_state.csv` | optimizer-state reset policy |

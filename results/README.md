@@ -207,6 +207,32 @@ PivotLoRA is above it in 28 of 30. Per-seed runs:
 `outputs/bert/lora_std_check.csv`, which also holds same-job reruns of `lora`
 and `pivotlora` at N = 64.
 
+### `faithful_baselines.csv` — baselines as published
+
+`task, n, metric, method, mean, std, num_seeds, source`
+
+Supplementary check, not in the paper. LoRAM, LoRA-GA, LoRA-One and SRLoRA run
+as their papers and official code specify (`--methods loram_paper lora_ga_paper
+lora_one_paper srlora_paper`), each at its own initialization scale, on the six
+primary tasks over N ∈ {16, ..., 256} with three seeds, next to the paper's
+versions and PivotLoRA from `bert_main.csv`. `lora_ga_paper_shared` is LoRA-GA
+as published with the shared √(5/d) scale on A. Mean score by N (16 to 256):
+
+| Method | 16 | 32 | 64 | 128 | 256 |
+|---|---|---|---|---|---|
+| PivotLoRA | .451 | .500 | .575 | .606 | .641 |
+| LoRA-GA as published | .427 | .452 | .523 | .583 | .636 |
+| LoRA-GA as published, shared scale | .396 | .409 | .447 | .518 | .584 |
+| LoRA-One as published | .409 | .417 | .462 | .575 | .621 |
+| LoRAM as published | .390 | .400 | .433 | .487 | .573 |
+| SRLoRA as published | .389 | .394 | .427 | .478 | .555 |
+
+PivotLoRA has the highest mean at every N and is above the four published
+versions in 111 of 120 settings (69 of 72 at N ≤ 64). At the shared scale,
+LoRA-GA as published is within 0.009 of the paper's version on average, so its
+gain at its own scale comes from the larger initial A. Per-seed runs:
+`outputs/bert/faithful_baselines.csv`.
+
 ### `robustness_five_seed.csv` — five-seed confirmation
 
 `task, n, method, mean, std, num_seeds, mean_gain_vs_lora, bootstrap_ci_low, bootstrap_ci_high, source`
