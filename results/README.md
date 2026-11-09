@@ -9,7 +9,7 @@ names where it came from:
 - a file path — read directly from that run artifact.
 
 Run `python analysis/verify_results.py` from the repository root to recompute
-every derived statistic from these CSVs — 146 checks, no model or GPU needed.
+every derived statistic from these CSVs — 148 checks, no model or GPU needed.
 Standard deviations are sample standard deviations (ddof = 1), except the
 Llama-3.1-8B EVA and BoolQ rows in `decoder_classification.csv`, which are
 population values (ddof = 0) because their per-seed scores were not retained.

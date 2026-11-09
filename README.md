@@ -129,7 +129,7 @@ python src/lr_sweep.py --probe                       # sweep grid, no training
 python src/activation_source_ablation.py --probe     # ablation grid, no training
 ```
 
-`analysis/verify_results.py` runs 146 checks covering every headline number.
+`analysis/verify_results.py` runs 148 checks covering every headline number.
 
 ---
 
@@ -399,7 +399,7 @@ PivotLoRA/
 ├── ablations/                            camera-ready ablations (script + per-seed CSV)
 │   ├── post_pivot_lr/                    Appendix F.10
 │   └── gpt2_summarization/               Appendix E.4
-├── analysis/verify_results.py            146 offline arithmetic checks
+├── analysis/verify_results.py            148 offline arithmetic checks
 └── tests/
     ├── test_pivot.py                     pivot algebra, PCA init, optimizer state
     └── test_answer_parser.py             numeric evaluator and the causal shift
